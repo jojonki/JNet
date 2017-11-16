@@ -18,6 +18,7 @@ def load_pickle(path):
 
 def load_task(dataset_path):
     ret_data = []
+    ctx_max_len = 0 # character level length
     with open(dataset_path) as f:
         data = json.load(f)
         ver = data['version']
@@ -27,13 +28,17 @@ def load_task(dataset_path):
             if i % 100 == 0: print('load_task:', i, '/', len(data))
             # print('load', d['title'], i, '/', len(data))
             for p in d['paragraphs']:
+                if len(p['context']) > ctx_max_len:
+                    ctx_max_len = len(p['context'])
                 c = word_tokenize(p['context'])
                 q, a = [], []
                 for qa in p['qas']:
                     q = word_tokenize(qa['question'])
                     a = [ans['text'] for ans in qa['answers']]
-                    ret_data.append((c, qa['id'], q, a))
-    return ret_data
+                    a_beg = [ans['answer_start'] for ans in qa['answers']]
+                    a_end = [ans['answer_start'] + len(ans['text']) for ans in qa['answers']]
+                    ret_data.append((c, qa['id'], q, a, a_beg, a_end))
+    return ret_data, ctx_max_len
 
 def load_glove_weights(glove_dir, embd_dim, vocab_size, word_index):
     embeddings_index = {}
@@ -70,4 +75,12 @@ def make_word_vector(data, w2i_w, query_len):
         index_vec = index_vec[:query_len]
         vec_data.append(index_vec)
     
+    return to_var(torch.LongTensor(vec_data))
+
+def make_one_hot(data, ans_size):
+    vec_data = []
+    for ans_id in data:
+        tmp = [0] * ans_size
+        tmp[ans_id] = 1
+        vec_data.append(tmp)
     return to_var(torch.LongTensor(vec_data))
