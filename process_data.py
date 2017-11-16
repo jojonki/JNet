@@ -22,7 +22,7 @@ def load_task(dataset_path):
     with open(dataset_path) as f:
         data = json.load(f)
         ver = data['version']
-        print('dataset version:', ver)
+        # print('dataset version:', ver)
         data = data['data']
         for i, d in enumerate(data):
             if i % 100 == 0: print('load_task:', i, '/', len(data))
@@ -62,8 +62,8 @@ def load_glove_weights(glove_dir, embd_dim, vocab_size, word_index):
     return embedding_matrix
 
 def to_var(x):
-    # if torch.cuda.is_available():
-        # x = x.cuda()
+    if torch.cuda.is_available():
+        x = x.cuda()
     return Variable(x)
 
 def make_word_vector(data, w2i_w, query_len):
