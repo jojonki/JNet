@@ -35,9 +35,22 @@ def load_task(dataset_path):
                 for qa in p['qas']:
                     q = word_tokenize(qa['question'])
                     a = [ans['text'] for ans in qa['answers']]
-                    a_beg = [ans['answer_start'] for ans in qa['answers']]
-                    a_end = [ans['answer_start'] + len(ans['text']) for ans in qa['answers']]
-                    ret_data.append((c, qa['id'], q, a, a_beg, a_end))
+                    # a_beg = [ans['answer_start'] for ans in qa['answers']]
+                    for ans in qa['answers']:
+                        try:
+                            a_beg = [c.index(ans['text'].split(' ')[0]) for ans in qa['answers']]
+                            # a_beg = c.index(a[0].split(' ')[0])
+                            a_end = [ans['answer_start'] + len(ans['text']) for ans in qa['answers']]
+
+                            ret_data.append((c, qa['id'], q, a, a_beg, a_end))
+                        except ValueError:
+                            pass
+                            # print('Invalid QA')
+                            # print('Context:', c)
+                            # print('Querstion:', q)
+                            # print('Answer', ans['text'].split(' ')[0])
+                    # break
+                # break
     return ret_data, ctx_max_len
 
 def load_glove_weights(glove_dir, embd_dim, vocab_size, word_index):
