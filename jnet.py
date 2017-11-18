@@ -10,19 +10,18 @@ class JNet(nn.Module):
         super(JNet, self).__init__()
         self.embd_size = args.embd_size
         h_emb = (int)(self.embd_size*0.5)
-        self.answer_seq_len = args.answer_seq_len
+        self.answer_token_len = args.answer_token_len
         
         self.embd = WordEmbedding(args)
         self.ctx_birnn = nn.ModuleList([nn.GRU(self.embd_size, h_emb, bidirectional=True, dropout=0.2) for _ in range(2)])
         self.query_birnn = nn.ModuleList([nn.GRU(self.embd_size, h_emb, bidirectional=True, dropout=0.2) for _ in range(2)])
         self.last_rnn = nn.GRU(self.embd_size, self.embd_size, bidirectional=True, dropout=0.2)
-#         self.last_layer = nn.Linear(args.ctx_sent_maxlen, args.ctx_sent_maxlen)
         
-        self.ptr_net = PointerNetwork(self.embd_size*2, self.embd_size*2, args.ctx_sent_maxlen, self.answer_seq_len) # TBD
+        self.ptr_net = PointerNetwork(self.embd_size*2, self.embd_size*2, args.ctx_token_maxlen, self.answer_token_len) # TBD
         
     def forward(self, context, query):
-        N = context.size(0)
-        JX = context.size(1)
+        N = context.size(0)  # Number of samples
+        JX = context.size(1) # Number of tokens (word level context length)
         
         x = self.embd(context) # (N, JX, d)
         q_embd = self.embd(query) # (N, JQ, d)

@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-# In : (N, sentence_len, vocab_size)
+# In : (N, sentence_len)
 # Out: (N, sentence_len, embd_size)
 class WordEmbedding(nn.Module):
     def __init__(self, args, is_train_embd=False):
@@ -13,3 +13,4 @@ class WordEmbedding(nn.Module):
         
     def forward(self, x):
         return F.relu(self.embedding(x))
+

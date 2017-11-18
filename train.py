@@ -19,45 +19,33 @@ parser.add_argument('--embd_size', type=int, default=100, help='word embedding s
 parser.add_argument('--use_pickles', type=int, default=1, help='use pickles for dataset')
 args = parser.parse_args()
 
-if args.use_pickles == 1:
-    train_data = load_pickle('./pickles/train_data.pickle')
-    dev_data = load_pickle('./pickles/dev_data.pickle')
-else:
-    train_data, train_ctx_maxlen = load_task('./dataset/train-v1.1.json')
-    save_pickle(train_data, './pickles/train_data.pickle')
-    dev_data, dev_ctx_maxlen = load_task('./dataset/dev-v1.1.json')
-    save_pickle(dev_data, './pickles/dev_data.pickle')
+# if args.use_pickles == 1:
+#     train_data = load_pickle('./pickles/train_data.pickle')
+#     dev_data = load_pickle('./pickles/dev_data.pickle')
+# else:
+#     train_data, train_ctx_maxlen = load_task('./dataset/train-v1.1.json')
+#     save_pickle(train_data, './pickles/train_data.pickle')
+#     dev_data, dev_ctx_maxlen = load_task('./dataset/dev-v1.1.json')
+#     save_pickle(dev_data, './pickles/dev_data.pickle')
 
-print('N train', len(train_data))
-print('N dev', len(dev_data))
-data = train_data+dev_data
-# ctx_maxlen = max(train_ctx_maxlen, dev_ctx_maxlen)
-# ctx_maxlen = 4063 #TODO
-# args.ctx_maxlen = ctx_maxlen
-# print('context char-level maxlen:', ctx_maxlen)
-
-vocab, vocab_a = set(), set()
-for ctx, _, query,answer, _, _ in data:
-    vocab |= set(ctx + query)# + answer)
-    vocab_a |= set(answer)
+train_data = load_processed_data('./dataset/train.txt')
+data = train_data
+vocab = set()
+for ctx, query, _ in data:
+    vocab |= set(ctx + query)
     
 vocab = list(sorted(vocab))
-vocab_a = list(sorted(vocab_a))
 w2i = dict((w, i) for i, w in enumerate(vocab, 0))
 i2w = dict((i, w) for i, w in enumerate(vocab, 0))
-a2i = dict((w, i) for i, w in enumerate(vocab_a, 0))
-i2a = dict((i, w) for i, w in enumerate(vocab_a, 0))
 args.vocab_size = len(vocab)
-args.ans_size = len(vocab_a)
 print('vocab size', len(vocab))
-print('ans size', len(vocab_a))
 
-ctx_sent_maxlen = max([len(c) for c, _, _, _, _, _ in data])
-query_sent_maxlen = max([len(q) for _, _, q, _, _, _ in data])
-print('ctx_sent_maxlen:', ctx_sent_maxlen)
-print('query_sent_maxlen:', query_sent_maxlen)
-args.ctx_sent_maxlen = ctx_sent_maxlen
-args.query_sent_maxlen = query_sent_maxlen
+ctx_token_maxlen = max([len(c) for c, _, _ in data])
+query_token_maxlen = max([len(q) for _, q, _ in data])
+print('ctx_token_maxlen:', ctx_token_maxlen)
+print('query_token_maxlen:', query_token_maxlen)
+args.ctx_token_maxlen = ctx_token_maxlen
+args.query_token_maxlen = query_token_maxlen
 args.answer_seq_len = 1 # 2 TODO
 
 glove_embd = load_pickle('./pickles/glove_embd.pickle')
@@ -107,6 +95,5 @@ for p in model.parameters():
     print(p)
 loss_fn = nn.NLLLoss()
 optimizer = torch.optim.Adadelta(filter(lambda p: p.requires_grad, model.parameters()), lr=0.01)
-# optimizer = torch.optim.Adadelta(model.parameters(), lr=0.5, weight_decay=0.999)
 train(model, optimizer, loss_fn)
 print('fin')

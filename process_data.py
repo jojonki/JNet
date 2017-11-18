@@ -16,6 +16,18 @@ def load_pickle(path):
     with open(path, mode='rb') as f:
         return pickle.load(f)
 
+def load_processed_data(fpath):
+    with open(fpath) as f:
+        lines = f.readlines()
+        data = []
+        for l in lines:
+            c, q, a = l.rstrip().split('\t')
+            c, q, a = c.split(' '), q.split(' '), a.split(' ')
+            a = [int(aa) for aa in a]
+            a = [a[0], a[-1]]
+            data.append((c, q, a))
+    return data
+
 def load_task(dataset_path):
     ret_data = []
     ctx_max_len = 0 # character level length
@@ -79,13 +91,17 @@ def to_var(x):
         x = x.cuda()
     return Variable(x)
 
+def add_padding(data, seq_len):
+    pad_len = max(0, seq_len - len(data))
+    data += [0] * pad_len
+    data = data[:seq_len]
+    return data
+
 def make_word_vector(data, w2i_w, query_len):
     vec_data = []
     for sentence in data:
         index_vec = [w2i_w[w] for w in sentence]
-        pad_len = max(0, query_len - len(index_vec))
-        index_vec += [0] * pad_len
-        index_vec = index_vec[:query_len]
+        index_vec = add_padding(index_vec, query_len)
         vec_data.append(index_vec)
     
     return to_var(torch.LongTensor(vec_data))
