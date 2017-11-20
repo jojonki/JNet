@@ -5,6 +5,10 @@ import torch.nn.functional as F
 from word_embedding import WordEmbedding
 
 class SimpleNet(nn.Module):
+    '''
+    This is a base model of using Similarity Matrix inspired by BiDAF
+    https://github.com/jojonki/BiDAF/blob/master/layers/attention_net.py
+    '''
     def __init__(self, args):
         super(SimpleNet, self).__init__()
         self.embd_size = args.embd_size
