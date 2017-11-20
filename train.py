@@ -3,7 +3,7 @@ import pickle
 import argparse
 # from nltk.tokenize import word_tokenize
 from tqdm import tqdm
-from process_data import save_pickle, load_pickle, load_task, load_glove_weights, to_var, make_word_vector
+from process_data import save_pickle, load_pickle, load_task, load_processed_data,  load_glove_weights, to_var, make_word_vector
 # from word_embedding import WordEmbedding
 import torch
 # import torch.nn as nn
@@ -12,6 +12,7 @@ from torch import optim
 import torch.nn as nn
 import torch.nn.functional as F
 from jnet import JNet
+from simple_net import SimpleNet
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--batch_size', type=int, default=8, help='input batch size')
@@ -29,7 +30,9 @@ args = parser.parse_args()
 #     save_pickle(dev_data, './pickles/dev_data.pickle')
 
 train_data = load_processed_data('./dataset/train.txt')
+# dev_data = load_processed_data('./dataset/dev.txt')
 data = train_data
+# data = dev_data
 vocab = set()
 for ctx, query, _ in data:
     vocab |= set(ctx + query)
@@ -46,33 +49,40 @@ print('ctx_token_maxlen:', ctx_token_maxlen)
 print('query_token_maxlen:', query_token_maxlen)
 args.ctx_token_maxlen = ctx_token_maxlen
 args.query_token_maxlen = query_token_maxlen
-args.answer_seq_len = 1 # 2 TODO
+args.answer_token_len = 1 # 2 TODO
+
 
 glove_embd = load_pickle('./pickles/glove_embd.pickle')
 # glove_embd = torch.from_numpy(load_glove_weights('./dataset', args.embd_size, len(vocab), w2i)).type(torch.FloatTensor)
 # save_pickle(glove_embd, './pickles/glove_embd.pickle')
 args.pre_embd = glove_embd
 
-def train(model, optimizer, loss_fn, n_epoch=5, batch_size=256):
+def train(data, model, optimizer, loss_fn, n_epoch=5, batch_size=32):
     for epoch in range(n_epoch):
         print('---Epoch', epoch)
         for i in tqdm(range(0, len(data)-batch_size, batch_size)): # TODO shuffle, last elms
             batch_data = data[i:i+batch_size]
             c = [d[0] for d in batch_data]
-            q = [d[2] for d in batch_data]
-            context_var = make_word_vector(c, w2i, ctx_sent_maxlen)
-            query_var = make_word_vector(q, w2i, query_sent_maxlen)
+            q = [d[1] for d in batch_data]
+            context_var = make_word_vector(c, w2i, ctx_token_maxlen)
+            query_var = make_word_vector(q, w2i, query_token_maxlen)
 #             labels = [[d[4][0], d[5][0]] for d in batch_data]
-            labels = [d[4][0] for d in batch_data]
+            labels = [d[2][0] for d in batch_data]
             labels = to_var(torch.LongTensor(labels))
-            outs = model(context_var, query_var)
-            outs = outs.view(-1, ctx_sent_maxlen) #(B*M, L)
+            outs = model(context_var, query_var) # (B, M, L)
+            # print('outs', outs.size())
+            # outs = outs.view(ctx_token_maxlen, -1).t().contiguous() # (B*M, L)
+            outs = outs.squeeze()
+            # outs = outs.view(-1, ctx_token_maxlen).contiguous() #(B*M, L)
+            # outs = outs.view(-1, ctx_token_maxlen) #(B*M, L)
+#             print('preds', torch.max(outs, 1)[1])
             labels = labels.view(-1) # (B*M)
+#             print('labels', labels)
             loss = loss_fn(outs, labels)
             if i % (batch_size*10) == 0:
+                # print('outs[0]', outs[0][:100])
                 print(loss.data[0])
-
-            optimizer.zero_grad()
+            model.zero_grad()
             loss.backward()
             optimizer.step()
 #             break
@@ -83,17 +93,18 @@ def train(model, optimizer, loss_fn, n_epoch=5, batch_size=256):
             if pred.data[0] == label.data[0]: 
                 ct+=1
         print('Acc', ct, '/', len(preds))
-        break
-        
+        # break 
     
 model = JNet(args)
+# model = SimpleNet(args)
 if torch.cuda.is_available():
     model.cuda()
 
-print(model)
-for p in model.parameters():
-    print(p)
+# print(model)
+# for p in model.parameters():
+#     print(p)
 loss_fn = nn.NLLLoss()
+# loss_fn = nn.CrossEntropyLoss()
 optimizer = torch.optim.Adadelta(filter(lambda p: p.requires_grad, model.parameters()), lr=0.01)
-train(model, optimizer, loss_fn)
+train(train_data, model, optimizer, loss_fn)
 print('fin')

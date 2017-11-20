@@ -4,14 +4,13 @@ import torch.nn.functional as F
 from process_data import to_var
 
 class PointerNetwork(nn.Module):
-    def __init__(self, hidden_size, weight_size, seq_len, answer_seq_len=2):
+    def __init__(self, hidden_size, weight_size, answer_seq_len=2):
         super(PointerNetwork, self).__init__()
 
         self.hidden_size = hidden_size
-        # self.input_size = input_size 
-        self.answer_seq_len = answer_seq_len
         self.weight_size = weight_size 
-        self.seq_len = seq_len
+        # self.input_seq_len = input_seq_len
+        self.answer_seq_len = answer_seq_len
         # self.emb_size = emb_size 
 
         # self.emb = nn.Embedding(input_size, emb_size)  # embed inputs
@@ -24,7 +23,9 @@ class PointerNetwork(nn.Module):
         self.tanh = nn.Tanh()
 
     def forward(self, input):
+        # input: (N, L, hidden_size) , L: sequence length
         batch_size = input.size(0)
+        L = input.size(1)
         # input = self.emb(input) # (N, L, hidden_size)
         # Encoding
         encoder_states, hc = self.enc(input) # encoder_state: (N, L, H)
@@ -49,6 +50,11 @@ class PointerNetwork(nn.Module):
             probs.append(out)
 
         probs = torch.stack(probs, dim=2) # (L, N, M)
-        probs = probs.permute(1, 2, 0)    #(N, M, L)
+        # print('probs', probs.size())
+        probs = probs.permute(1, 2, 0).contiguous()    #(N, M, L)
+        probs = F.log_softmax(probs.view(-1, L))
+        probs = probs.view(batch_size, self.answer_seq_len, L)
+        # print('probs', probs.size())
 
-        return F.log_softmax(probs)
+        # return F.log_softmax(probs)
+        return probs
