@@ -55,7 +55,8 @@ def preprocess(fpath_read, fpath_write):
                     answer_seq = []
                     for i in range(len(answer_words)):
                         assert(i<len(right_context))
-                        answer_seq.append(str(len(left_context)+i+1))
+                        # answer_seq.append(str(len(left_context)+i+1))
+                        answer_seq.append(str(len(left_context)+i))
                     if len(answer_seq) == 0:
                         print('join_ar', join_ar)
                         print('join_a', join_a)
