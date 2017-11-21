@@ -16,6 +16,9 @@ def load_pickle(path):
     with open(path, mode='rb') as f:
         return pickle.load(f)
 
+def lower_list(str_list):
+    return [str_var.lower() for str_var in str_list]
+
 def load_processed_data(fpath):
     with open(fpath) as f:
         lines = f.readlines()
@@ -23,6 +26,8 @@ def load_processed_data(fpath):
         for l in lines:
             c, q, a = l.rstrip().split('\t')
             c, q, a = c.split(' '), q.split(' '), a.split(' ')
+            # if len(c) > 30: continue # TMP
+            c, q = lower_list(c), lower_list(q)
             a = [int(aa) for aa in a]
             a = [a[0], a[-1]]
             data.append((c, q, a))
@@ -78,11 +83,17 @@ def load_glove_weights(glove_dir, embd_dim, vocab_size, word_index):
     print('Found %s word vectors.' % len(embeddings_index)) 
     embedding_matrix = np.zeros((vocab_size, embd_dim))
     print('embed_matrix.shape', embedding_matrix.shape)
+    count = 0
     for word, i in word_index.items():
         embedding_vector = embeddings_index.get(word)
         if embedding_vector is not None:
             # words not found in embedding index will be all-zeros.
             embedding_matrix[i] = embedding_vector
+            count += 1
+        # else:
+        #     print('not found', word)
+        #     if count > 1000: break
+    print('Use pre-embedded weights:', count, '/', len(word_index.items()))
 
     return embedding_matrix
 
