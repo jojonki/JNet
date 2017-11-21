@@ -1,3 +1,5 @@
+import os
+import shutil
 import json
 import pickle
 import argparse
@@ -16,21 +18,19 @@ from simple_net import SimpleNet
 from match_lstm import MatchLSTM
 import time
 
+def save_checkpoint(state, is_best, filename='checkpoint.tar', out_filename='model_best.tar'):
+    torch.save(state, filename)
+    if is_best:
+        shutil.copyfile(filename, out_filename)
+
 parser = argparse.ArgumentParser()
 parser.add_argument('--batch_size', type=int, default=8, help='input batch size')
 parser.add_argument('--embd_size', type=int, default=100, help='word embedding size')
 parser.add_argument('--hidden_size', type=int, default=150, help='word embedding size')
 parser.add_argument('--use_pickles', type=int, default=1, help='use pickles for dataset')
+parser.add_argument('--resume', default='./model_best.tar', type=str, metavar='PATH',
+                    help='path to latest checkpoint (default: none)')
 args = parser.parse_args()
-
-# if args.use_pickles == 1:
-#     train_data = load_pickle('./pickles/train_data.pickle')
-#     dev_data = load_pickle('./pickles/dev_data.pickle')
-# else:
-#     train_data, train_ctx_maxlen = load_task('./dataset/train-v1.1.json')
-#     save_pickle(train_data, './pickles/train_data.pickle')
-#     dev_data, dev_ctx_maxlen = load_task('./dataset/dev-v1.1.json')
-#     save_pickle(dev_data, './pickles/dev_data.pickle')
 
 train_data = load_processed_data('./dataset/train.txt')
 # dev_data = load_processed_data('./dataset/dev.txt')
@@ -50,15 +50,12 @@ ctx_token_maxlen = max([len(c) for c, _, _ in data])
 query_token_maxlen = max([len(q) for _, q, _ in data])
 print('ctx_token_maxlen:', ctx_token_maxlen)
 print('query_token_maxlen:', query_token_maxlen)
-# args.ctx_token_maxlen = ctx_token_maxlen
-# args.query_token_maxlen = query_token_maxlen
 args.answer_token_len = 1 # 2 TODO
 
 
-# glove_embd = load_pickle('./pickles/glove_embd.pickle')
-glove_embd = torch.from_numpy(load_glove_weights('./dataset', args.embd_size, len(vocab), w2i)).type(torch.FloatTensor)
-save_pickle(glove_embd, './pickles/glove_embd.pickle')
-args.pre_embd = glove_embd
+args.pre_embd = load_pickle('./pickles/glove_embd.pickle')
+# args.pre_embd = torch.from_numpy(load_glove_weights('./dataset', args.embd_size, len(vocab), w2i)).type(torch.FloatTensor)
+# save_pickle(args.pre_embd, './pickles/glove_embd.pickle')
 
 def train(data, model, optimizer, loss_fn, n_epoch=5, batch_size=32):
     for epoch in range(n_epoch):
@@ -74,7 +71,7 @@ def train(data, model, optimizer, loss_fn, n_epoch=5, batch_size=32):
             q = [d[1] for d in batch_data]
             b_ctx_token_maxlen = max([len(cc) for cc in c])
             b_query_token_maxlen = max([len(qq) for qq in q])
-            # print('BATCH context maxlen: {}, query maxlen: {}'.format(b_ctx_token_maxlen, b_query_token_maxlen))
+            print('BATCH context maxlen: {}, query maxlen: {}'.format(b_ctx_token_maxlen, b_query_token_maxlen))
             context_var = make_word_vector(c, w2i, b_ctx_token_maxlen)
             query_var = make_word_vector(q, w2i, b_query_token_maxlen)
             labels = [d[2][0] for d in batch_data]
@@ -86,15 +83,13 @@ def train(data, model, optimizer, loss_fn, n_epoch=5, batch_size=32):
             # outs = outs.view(-1, ctx_token_maxlen) #(B*M, L)
 #             print('preds', torch.max(outs, 1)[1])
             labels = labels.view(-1) # (B*M)
-#             print('labels', labels)
             loss = loss_fn(outs, labels)
             if i % (batch_size*10) == 0:
                 # print('outs[0]', outs[0][:100])
-                print(loss.data[0])
+                print(loss.data)
             model.zero_grad()
             loss.backward()
             optimizer.step()
-#             break
         
         _, preds = torch.max(outs, 1)
         ct = 0
@@ -102,11 +97,31 @@ def train(data, model, optimizer, loss_fn, n_epoch=5, batch_size=32):
             if pred.data[0] == label.data[0]: 
                 ct+=1
         print('Acc', ct, '/', len(preds))
-        # break 
+
+        save_checkpoint({
+            'epoch': epoch + 1,
+            'state_dict': model.state_dict(),
+            'optimizer' : optimizer.state_dict(),
+        }, is_best=True)
     
 # model = JNet(args)
 model = MatchLSTM(args)
 # model = SimpleNet(args)
+optimizer = torch.optim.Adamax(filter(lambda p: p.requires_grad, model.parameters()))#, lr=0.01)
+
+if args.resume:
+    if os.path.isfile(args.resume):
+        print("=> loading checkpoint '{}'".format(args.resume))
+        checkpoint = torch.load(args.resume)
+        args.start_epoch = checkpoint['epoch']
+        # best_prec1 = checkpoint['best_prec1']
+        model.load_state_dict(checkpoint['state_dict'])
+        optimizer.load_state_dict(checkpoint['optimizer'])
+        print("=> loaded checkpoint '{}' (epoch {})"
+              .format(args.resume, checkpoint['epoch']))
+    else:
+        print("=> no checkpoint found at '{}'".format(args.resume))
+
 if torch.cuda.is_available():
     model.cuda()
 
@@ -115,6 +130,5 @@ if torch.cuda.is_available():
 #     print(p)
 loss_fn = nn.NLLLoss()
 # loss_fn = nn.CrossEntropyLoss()
-optimizer = torch.optim.Adamax(filter(lambda p: p.requires_grad, model.parameters()))#, lr=0.01)
 train(train_data, model, optimizer, loss_fn)
 print('fin')
