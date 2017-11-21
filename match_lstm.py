@@ -18,62 +18,67 @@ class MatchLSTM(nn.Module):
         super(MatchLSTM, self).__init__()
         self.embd_size = args.embd_size
         d = self.embd_size
-        # h_d = (int)(0.5*d)
+        self.hidden_size = args.hidden_size
+        h = self.hidden_size
         self.answer_token_len = args.answer_token_len
         
         self.embd = WordEmbedding(args)
-        self.ctx_rnn   = nn.GRU(d, d, dropout = 0.2)
-        self.query_rnn = nn.GRU(d, d, dropout = 0.2)
-        # self.last_rnn = nn.GRU(d, d, bidirectional=True, dropout=0.2)
+        self.ctx_rnn   = nn.GRU(d, h, dropout = 0.2)
+        self.query_rnn = nn.GRU(d, h, dropout = 0.2)
         
-        # self.ptr_net = PointerNetwork(d*2, d*2, args.ctx_token_maxlen, self.answer_token_len) # TBD
-        self.ptr_net = PointerNetwork(d, d, self.answer_token_len) # TBD
+        self.ptr_net = PointerNetwork(h, h, self.answer_token_len) # TBD
 
-        self.w  = nn.Parameter(torch.rand(1, d, 1).type(torch.FloatTensor), requires_grad=True) # (1, 1, d)
-        self.Wq = nn.Parameter(torch.rand(1, d, d).type(torch.FloatTensor), requires_grad=True) # (1, d, d)
-        self.Wp = nn.Parameter(torch.rand(1, d, d).type(torch.FloatTensor), requires_grad=True) # (1, d, d)
-        self.Wr = nn.Parameter(torch.rand(1, d, d).type(torch.FloatTensor), requires_grad=True) # (1, d, d)
+        self.w  = nn.Parameter(torch.rand(1, h, 1).type(torch.FloatTensor), requires_grad=True) # (1, 1, h)
+        self.Wq = nn.Parameter(torch.rand(1, h, h).type(torch.FloatTensor), requires_grad=True) # (1, h, h)
+        self.Wp = nn.Parameter(torch.rand(1, h, h).type(torch.FloatTensor), requires_grad=True) # (1, h, h)
+        self.Wr = nn.Parameter(torch.rand(1, h, h).type(torch.FloatTensor), requires_grad=True) # (1, h, h)
         # TODO bias
 
-        self.match_lstm_cell = nn.LSTMCell(2*d, d)
+        # self.match_lstm_cell = nn.LSTMCell(2*h, h)
+        self.match_lstm_cell = nn.GRUCell(2*h, h)
 
     def forward(self, context, query):
         # params
         d = self.embd_size
+        h = self.hidden_size
         bs = context.size(0) # batch size
         T = context.size(1)  # context length 
         J = query.size(1)    # query length
 
         # LSTM Preprocessing Layer
+        shape = (bs, T, J, h)
         embd_context     = self.embd(context)         # (N, T, d)
-        embd_context, _h = self.ctx_rnn(embd_context) # (N, T, d)
-        embd_query       = self.embd(query)           # (N, J, d)
-        embd_query, _h   = self.query_rnn(embd_query) # (N, J, d)
+        embd_context, _h = self.ctx_rnn(embd_context) # (N, T, h)
+        embd_context_ex  = embd_context.unsqueeze(2).expand(shape).contiguous() # (N, T, J, h)
+        embd_query       = self.embd(query)           # (N, J, h)
+        embd_query, _h   = self.query_rnn(embd_query) # (N, J, h)
+        embd_query_ex    = embd_query.unsqueeze(1).expand(shape).contiguous() # (N, T, J, h)
 
         # Match-LSTM layer
-        # attention = to_var(torch.zeros(bs, T, J)) # (N, T, J)
-        G = to_var(torch.zeros(bs, T, J, d)) # (N, T, J, d)
+        G = to_var(torch.zeros(bs, T, J, h)) # (N, T, J, h)
+        
+        wh_q = torch.bmm(embd_query, self.Wq.expand(bs, h, h)) # (N, J, h) = (N, J, h)(N, h, h)
 
-        wh_q = torch.bmm(embd_query, self.Wq.expand(bs, d, d)) # (N, J, d) = (N, J, d)(N, d, d)
-
-        hidden     = to_var(torch.randn([bs, d])) # (N, d)
-        cell_state = to_var(torch.randn([bs, d])) # (N, d)
+        hidden     = to_var(torch.zeros([bs, h])) # (N, h)
+        # cell_state = to_var(torch.zeros([bs, h])) # (N, h)
         # TODO bidirectional
         H_r = [hidden]
+        # H_r = [hidden for _ in range(T)] # dummy
         for i in range(T):
-            wh_p_i = torch.bmm(embd_context[:,i,:].clone().unsqueeze(1), self.Wp.expand(bs, d, d)).squeeze() # (N, 1, d) -> (N, d)
-            wh_r_i = torch.bmm(hidden.unsqueeze(1), self.Wr.expand(bs, d, d)).squeeze() # (N, 1, d) -> (N, d)
-            sec_elm = (wh_p_i + wh_r_i).unsqueeze(1).expand(bs, J, d) # (N, J, d)
+            wh_p_i = torch.bmm(embd_context[:,i,:].clone().unsqueeze(1), self.Wp.expand(bs, h, h)) # (N, 1, h)
+            wh_r_i = torch.bmm(hidden.unsqueeze(1), self.Wr.expand(bs, h, h)) # (N, 1, h)
+            sec_elm = (wh_p_i + wh_r_i).expand(bs, J, h) # (N, J, h)
 
-            G[:,i,:,:] = F.tanh( (wh_q + sec_elm).view(-1, d) ).view(bs, J, d) # (N, J, d) # TODO bias
+            G[:,i,:,:] = F.tanh( (wh_q + sec_elm).view(-1, h) ).view(bs, J, h) # (N, J, h) # TODO bias
 
-            attn_i = torch.bmm(G[:,i,:,:].clone(), self.w.expand(bs, d, 1)).squeeze() # (N, J)
-            attn_query = torch.bmm(attn_i.unsqueeze(1), embd_query).squeeze() # (N, d) 
-            z = torch.cat((embd_context[:,i,:], attn_query), 1) # (N, 2d)
+            attn_i = torch.bmm(G[:,i,:,:].clone(), self.w.expand(bs, h, 1)).squeeze() # (N, J)
+            attn_query = torch.bmm(attn_i.unsqueeze(1), embd_query).squeeze() # (N, h) = (N, 1, J)(N, J, H)
+            z = torch.cat((embd_context[:,i,:], attn_query), 1) # (N, 2h)
 
-            hidden, cell_state = self.match_lstm_cell(z, (hidden, cell_state)) # (N, d), (N, d)
+            # hidden, cell_state = self.match_lstm_cell(z, (hidden, cell_state)) # (N, h), (N, h)
+            hidden  = self.match_lstm_cell(z, hidden) # (N, h)
             H_r.append(hidden)
-        H_r = torch.stack(H_r, dim=1) # (N, T, d)
+        H_r = torch.stack(H_r, dim=1) # (N, T, h)
 
         indices = self.ptr_net(H_r) # (N, M, T) , M means (start, end)
         return indices
