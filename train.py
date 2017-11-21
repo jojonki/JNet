@@ -13,10 +13,13 @@ import torch.nn as nn
 import torch.nn.functional as F
 from jnet import JNet
 from simple_net import SimpleNet
+from match_lstm import MatchLSTM
+import time
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--batch_size', type=int, default=8, help='input batch size')
 parser.add_argument('--embd_size', type=int, default=100, help='word embedding size')
+parser.add_argument('--hidden_size', type=int, default=150, help='word embedding size')
 parser.add_argument('--use_pickles', type=int, default=1, help='use pickles for dataset')
 args = parser.parse_args()
 
@@ -37,7 +40,7 @@ vocab = set()
 for ctx, query, _ in data:
     vocab |= set(ctx + query)
     
-vocab = list(sorted(vocab))
+vocab = ['<PAD>', '<UNK'] + list(sorted(vocab))
 w2i = dict((w, i) for i, w in enumerate(vocab, 0))
 i2w = dict((i, w) for i, w in enumerate(vocab, 0))
 args.vocab_size = len(vocab)
@@ -47,30 +50,36 @@ ctx_token_maxlen = max([len(c) for c, _, _ in data])
 query_token_maxlen = max([len(q) for _, q, _ in data])
 print('ctx_token_maxlen:', ctx_token_maxlen)
 print('query_token_maxlen:', query_token_maxlen)
-args.ctx_token_maxlen = ctx_token_maxlen
-args.query_token_maxlen = query_token_maxlen
+# args.ctx_token_maxlen = ctx_token_maxlen
+# args.query_token_maxlen = query_token_maxlen
 args.answer_token_len = 1 # 2 TODO
 
 
-glove_embd = load_pickle('./pickles/glove_embd.pickle')
-# glove_embd = torch.from_numpy(load_glove_weights('./dataset', args.embd_size, len(vocab), w2i)).type(torch.FloatTensor)
-# save_pickle(glove_embd, './pickles/glove_embd.pickle')
+# glove_embd = load_pickle('./pickles/glove_embd.pickle')
+glove_embd = torch.from_numpy(load_glove_weights('./dataset', args.embd_size, len(vocab), w2i)).type(torch.FloatTensor)
+save_pickle(glove_embd, './pickles/glove_embd.pickle')
 args.pre_embd = glove_embd
 
 def train(data, model, optimizer, loss_fn, n_epoch=5, batch_size=32):
     for epoch in range(n_epoch):
         print('---Epoch', epoch)
+        # start = time.time()
         for i in tqdm(range(0, len(data)-batch_size, batch_size)): # TODO shuffle, last elms
+            # elapsed_time = time.time() - start
+            # print ("elapsed_time:{0}".format(elapsed_time) + "[sec]")
+            # start = time.time()
+
             batch_data = data[i:i+batch_size]
             c = [d[0] for d in batch_data]
             q = [d[1] for d in batch_data]
-            context_var = make_word_vector(c, w2i, ctx_token_maxlen)
-            query_var = make_word_vector(q, w2i, query_token_maxlen)
-#             labels = [[d[4][0], d[5][0]] for d in batch_data]
+            b_ctx_token_maxlen = max([len(cc) for cc in c])
+            b_query_token_maxlen = max([len(qq) for qq in q])
+            # print('BATCH context maxlen: {}, query maxlen: {}'.format(b_ctx_token_maxlen, b_query_token_maxlen))
+            context_var = make_word_vector(c, w2i, b_ctx_token_maxlen)
+            query_var = make_word_vector(q, w2i, b_query_token_maxlen)
             labels = [d[2][0] for d in batch_data]
             labels = to_var(torch.LongTensor(labels))
             outs = model(context_var, query_var) # (B, M, L)
-            # print('outs', outs.size())
             # outs = outs.view(ctx_token_maxlen, -1).t().contiguous() # (B*M, L)
             outs = outs.squeeze()
             # outs = outs.view(-1, ctx_token_maxlen).contiguous() #(B*M, L)
@@ -95,7 +104,8 @@ def train(data, model, optimizer, loss_fn, n_epoch=5, batch_size=32):
         print('Acc', ct, '/', len(preds))
         # break 
     
-model = JNet(args)
+# model = JNet(args)
+model = MatchLSTM(args)
 # model = SimpleNet(args)
 if torch.cuda.is_available():
     model.cuda()
@@ -105,6 +115,6 @@ if torch.cuda.is_available():
 #     print(p)
 loss_fn = nn.NLLLoss()
 # loss_fn = nn.CrossEntropyLoss()
-optimizer = torch.optim.Adadelta(filter(lambda p: p.requires_grad, model.parameters()), lr=0.01)
+optimizer = torch.optim.Adamax(filter(lambda p: p.requires_grad, model.parameters()))#, lr=0.01)
 train(train_data, model, optimizer, loss_fn)
 print('fin')

@@ -9,6 +9,7 @@ class WordEmbedding(nn.Module):
         super(WordEmbedding, self).__init__()
         self.embedding = nn.Embedding(args.vocab_size, args.embd_size)
         if args.pre_embd is not None:
+            print('Set pretrained embedding weights')
             self.embedding.weight = nn.Parameter(args.pre_embd, requires_grad=is_train_embd)
         
     def forward(self, x):
