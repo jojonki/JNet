@@ -16,6 +16,9 @@ class MatchLSTM(nn.Module):
     '''
     def __init__(self, args):
         super(MatchLSTM, self).__init__()
+        initrange = 0.1
+        self.initrange = initrange
+
         self.embd_size        = args.embd_size
         d                     = self.embd_size
         self.hidden_size      = args.hidden_size
@@ -26,12 +29,12 @@ class MatchLSTM(nn.Module):
         self.ctx_rnn   = nn.GRU(d, h, dropout = 0.2)
         self.query_rnn = nn.GRU(d, h, dropout = 0.2)
         
-        self.w  = nn.Parameter(torch.randn(1, h, 1).type(torch.FloatTensor), requires_grad=True) # (1, 1, h)
-        self.Wq = nn.Parameter(torch.randn(1, h, h).type(torch.FloatTensor), requires_grad=True) # (1, h, h)
-        self.Wp = nn.Parameter(torch.randn(1, h, h).type(torch.FloatTensor), requires_grad=True) # (1, h, h)
-        self.Wr = nn.Parameter(torch.randn(1, h, h).type(torch.FloatTensor), requires_grad=True) # (1, h, h)
-        self.gate_bias = nn.Parameter(torch.randn(1, 1, h))
-        self.attn_bias = nn.Parameter(torch.randn(1, 1))
+        self.w  = nn.Parameter(torch.Tensor(1, h, 1).uniform_(-initrange, initrange), requires_grad=True) # (1, 1, h)
+        self.Wq = nn.Parameter(torch.Tensor(1, h, h).uniform_(-initrange, initrange), requires_grad=True) # (1, h, h)
+        self.Wp = nn.Parameter(torch.Tensor(1, h, h).uniform_(-initrange, initrange), requires_grad=True) # (1, h, h)
+        self.Wr = nn.Parameter(torch.Tensor(1, h, h).uniform_(-initrange, initrange), requires_grad=True) # (1, h, h)
+        self.gate_bias = nn.Parameter(torch.zeros(1, 1, h))
+        self.attn_bias = nn.Parameter(torch.zeros(1, 1))
 
         # self.match_lstm_cell = nn.LSTMCell(2*h, h)
         self.match_lstm_cell   = nn.GRUCell(2*h, h)
@@ -39,6 +42,13 @@ class MatchLSTM(nn.Module):
 
         # PointerNetworks for boundary model
         self.ptr_net = PointerNetwork(2*h, 2*h, self.answer_token_len) # TBD
+        
+        self.init_weights()
+
+    def init_weights(self):
+        pass
+        # initrange = self.initrange
+        # self.ctx_rnn.weight.data.uniform_(-initrange, initrange)
 
     def forward(self, context, query):
         # params

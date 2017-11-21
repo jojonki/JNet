@@ -22,6 +22,13 @@ class PointerNetwork(nn.Module):
 
         self.tanh = nn.Tanh()
 
+        self.init_weights()
+
+    def init_weights(self):
+        self.W1.bias.data.fill_(0)
+        self.W2.bias.data.fill_(0)
+        self.vt.bias.data.fill_(0)
+
     def forward(self, input):
         # input: (N, L, hidden_size) , L: sequence length
         batch_size = input.size(0)
@@ -58,3 +65,4 @@ class PointerNetwork(nn.Module):
 
         # return F.log_softmax(probs)
         return probs
+
