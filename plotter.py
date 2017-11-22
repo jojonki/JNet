@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-def plot_heat_matrix(context, query, attn_data, ans_pair, fig_size=[15, 55], output_file='attention_matrix.pdf', scale=10.0):
+def plot_heat_matrix(context, query, attn_data, ans_pair, fig_size=[15, 60], output_file='attention_matrix.pdf', scale=10.0):
     '''
         data: (x, y) # (context_len, query_len)
     '''
@@ -12,7 +12,7 @@ def plot_heat_matrix(context, query, attn_data, ans_pair, fig_size=[15, 55], out
     data *= scale # for vivid color
     # ans_pair = [ans_pair[0].cpu().data[0], ans_pair[1].cpu().data[0]]
 
-    fig_size[1] = max(fig_size[1], int(fig_size[1] * len(context)/200)) # TODO Hard code
+    # fig_size[1] = max(fig_size[1], int(fig_size[1] * len(context)/300)) # TODO Hard code
 
     # https://stackoverflow.com/questions/14391959/heatmap-in-matplotlib-with-pcolor
     fig, ax = plt.subplots()
