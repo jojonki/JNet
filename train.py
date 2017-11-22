@@ -1,27 +1,26 @@
 import os
 import shutil
-import json
 import pickle
 import argparse
-# from nltk.tokenize import word_tokenize
+import time
+import random
 from tqdm import tqdm
-from process_data import save_pickle, load_pickle, load_task, load_processed_data,  load_glove_weights, to_var, make_word_vector
-# from word_embedding import WordEmbedding
+
 import torch
-# import torch.nn as nn
-# from torch.autograd import Variable
 from torch import optim
 import torch.nn as nn
 import torch.nn.functional as F
+
+from process_data import save_pickle, load_pickle, load_task, load_processed_data,  load_glove_weights, to_var, make_word_vector
 from jnet import JNet
 from simple_net import SimpleNet
 from match_lstm import MatchLSTM
-import time
 
-def save_checkpoint(state, is_best, filename='checkpoint.tar', out_filename='model_best.tar'):
+def save_checkpoint(state, is_best, filename='checkpoint.tar', best_filename='model_best.tar'):
+    print('save_model', filename, best_filename)
     torch.save(state, filename)
     if is_best:
-        shutil.copyfile(filename, out_filename)
+        shutil.copyfile(filename, best_filename)
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--batch_size', type=int, default=8, help='input batch size')
@@ -60,6 +59,7 @@ args.pre_embd = load_pickle('./pickles/glove_embd.pickle')
 def train(data, model, optimizer, loss_fn, n_epoch=5, batch_size=32):
     for epoch in range(n_epoch):
         print('---Epoch', epoch)
+        random.shuffle(data)
         # start = time.time()
         for i in tqdm(range(0, len(data)-batch_size, batch_size)): # TODO shuffle, last elms
             # elapsed_time = time.time() - start
@@ -73,7 +73,7 @@ def train(data, model, optimizer, loss_fn, n_epoch=5, batch_size=32):
             b_query_token_maxlen = max([len(qq) for qq in q])
             print('BATCH context maxlen: {}, query maxlen: {}'.format(b_ctx_token_maxlen, b_query_token_maxlen))
             context_var = make_word_vector(c, w2i, b_ctx_token_maxlen)
-            query_var = make_word_vector(q, w2i, b_query_token_maxlen)
+            query_var   = make_word_vector(q, w2i, b_query_token_maxlen)
             labels = [d[2][0] for d in batch_data]
             labels = to_var(torch.LongTensor(labels))
             outs = model(context_var, query_var) # (B, M, L)
