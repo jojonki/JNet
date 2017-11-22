@@ -34,9 +34,8 @@ args = parser.parse_args()
 args.start_epoch = 0
 
 train_data = load_processed_data('./dataset/train.txt')
-# dev_data = load_processed_data('./dataset/dev.txt')
-data = train_data
-# data = dev_data
+dev_data = load_processed_data('./dataset/dev.txt')
+data = train_data + dev_data
 vocab = set()
 for ctx, query, _ in data:
     vocab |= set(ctx + query)
@@ -54,9 +53,9 @@ print('query_token_maxlen:', query_token_maxlen)
 args.answer_token_len = 1 # 2 TODO
 
 
-args.pre_embd = load_pickle('./pickles/glove_embd.pickle')
-# args.pre_embd = torch.from_numpy(load_glove_weights('./dataset', args.embd_size, len(vocab), w2i)).type(torch.FloatTensor)
-# save_pickle(args.pre_embd, './pickles/glove_embd.pickle')
+# args.pre_embd = load_pickle('./pickles/glove_embd.pickle')
+args.pre_embd = torch.from_numpy(load_glove_weights('./dataset', args.embd_size, len(vocab), w2i)).type(torch.FloatTensor)
+save_pickle(args.pre_embd, './pickles/glove_embd.pickle')
 
 def train(data, model, optimizer, loss_fn, n_epoch=5, start_epoch=0, batch_size=32):
     print('Training starts from', start_epoch, 'to', n_epoch)
@@ -64,7 +63,7 @@ def train(data, model, optimizer, loss_fn, n_epoch=5, start_epoch=0, batch_size=
         print('---Epoch', epoch)
         random.shuffle(data)
         # start = time.time()
-        for i in tqdm(range(0, len(data)-batch_size, batch_size)): # TODO shuffle, last elms
+        for i in tqdm(range(0, len(data)-batch_size, batch_size)): # TODO use last elms
             # elapsed_time = time.time() - start
             # print ("elapsed_time:{0}".format(elapsed_time) + "[sec]")
             # start = time.time()
@@ -106,11 +105,44 @@ def train(data, model, optimizer, loss_fn, n_epoch=5, start_epoch=0, batch_size=
             'state_dict': model.state_dict(),
             'optimizer' : optimizer.state_dict(),
         }, is_best=True)
+
+def test(data, model, batch_size=32):
+    correct = 0
+    total = 0
+    for i in tqdm(range(0, len(data)-batch_size, batch_size)):  # TODO last elms
+        batch_data = data[i:i+batch_size]
+        c = [d[0] for d in batch_data]
+        q = [d[1] for d in batch_data]
+        b_ctx_token_maxlen = max([len(cc) for cc in c])
+        b_query_token_maxlen = max([len(qq) for qq in q])
+        context_var = make_word_vector(c, w2i, b_ctx_token_maxlen)
+        query_var   = make_word_vector(q, w2i, b_query_token_maxlen)
+        labels = [d[2][0] for d in batch_data]
+        labels = to_var(torch.LongTensor(labels))
+        outs = model(context_var, query_var) # (B, M, L)
+        outs = outs.squeeze()
+        labels = labels.view(-1) # (B*M)
+        loss = loss_fn(outs, labels)
+        if i % (batch_size*10) == 0:
+            # print('outs[0]', outs[0][:100])
+            print(loss.data)
+        model.zero_grad()
+        loss.backward()
+        optimizer.step()
+    
+        _, preds = torch.max(outs, 1)
+        for pred, label in zip(preds, labels):
+            if pred.data[0] == label.data[0]: 
+                correct += 1
+        total += batch_size
+    print('Test Acc', correct/total, correct, '/', total)
     
 # model = JNet(args)
 model = MatchLSTM(args)
 # model = SimpleNet(args)
 optimizer = torch.optim.Adamax(filter(lambda p: p.requires_grad, model.parameters()))#, lr=0.01)
+loss_fn = nn.NLLLoss()
+# loss_fn = nn.CrossEntropyLoss()
 
 if args.resume:
     if os.path.isfile(args.resume):
@@ -131,7 +163,9 @@ if torch.cuda.is_available():
 # print(model)
 # for p in model.parameters():
 #     print(p)
-loss_fn = nn.NLLLoss()
-# loss_fn = nn.CrossEntropyLoss()
-train(train_data, model, optimizer, loss_fn, args.n_epoch, args.start_epoch)
+
+# train(train_data, model, optimizer, loss_fn, args.n_epoch, args.start_epoch)
+test(dev_data, model)
+
 print('fin')
+
