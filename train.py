@@ -7,14 +7,13 @@ import random
 from tqdm import tqdm
 
 import torch
-from torch import optim
 import torch.nn as nn
-import torch.nn.functional as F
 
-from process_data import save_pickle, load_pickle, load_task, load_processed_data,  load_glove_weights, to_var, make_word_vector
-from jnet import JNet
-from simple_net import SimpleNet
+from process_data import save_pickle, load_pickle, load_processed_data,  load_glove_weights, to_var, make_word_vector
+# from jnet import JNet
+# from simple_net import SimpleNet
 from match_lstm import MatchLSTM
+
 
 def save_checkpoint(state, is_best, filename='checkpoint.tar', best_filename='model_best.tar'):
     print('save_model', filename, best_filename)
@@ -23,12 +22,30 @@ def save_checkpoint(state, is_best, filename='checkpoint.tar', best_filename='mo
         shutil.copyfile(filename, best_filename)
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--batch_size', type=int, default=8, help='input batch size')
-parser.add_argument('--embd_size', type=int, default=100, help='word embedding size')
-parser.add_argument('--hidden_size', type=int, default=150, help='word embedding size')
-parser.add_argument('--use_pickles', type=int, default=1, help='use pickles for dataset')
-parser.add_argument('--n_epoch', type=int, default=10, help='number of epochs')
-parser.add_argument('--resume', default='./model_best.tar', type=str, metavar='PATH',
+parser.add_argument('--batch_size',
+                    type=int,
+                    default=8,
+                    help='input batch size')
+parser.add_argument('--embd_size',
+                    type=int,
+                    default=100,
+                    help='word embedding size')
+parser.add_argument('--hidden_size',
+                    type=int,
+                    default=150,
+                    help='word embedding size')
+parser.add_argument('--use_pickles',
+                    type=int,
+                    default=1,
+                    help='use pickles for dataset')
+parser.add_argument('--n_epoch',
+                    type=int,
+                    default=10,
+                    help='number of epochs')
+parser.add_argument('--resume',
+                    type=str,
+                    default='./model_best.tar',
+                    metavar='PATH',
                     help='path to latest checkpoint (default: none)')
 args = parser.parse_args()
 args.start_epoch = 0
@@ -39,7 +56,7 @@ data = train_data + dev_data
 vocab = set()
 for ctx, query, _ in data:
     vocab |= set(ctx + query)
-    
+
 vocab = ['<PAD>', '<UNK'] + list(sorted(vocab))
 w2i = dict((w, i) for i, w in enumerate(vocab, 0))
 i2w = dict((i, w) for i, w in enumerate(vocab, 0))
@@ -56,6 +73,7 @@ args.answer_token_len = 1 # 2 TODO
 # args.pre_embd = load_pickle('./pickles/glove_embd.pickle')
 args.pre_embd = torch.from_numpy(load_glove_weights('./dataset', args.embd_size, len(vocab), w2i)).type(torch.FloatTensor)
 save_pickle(args.pre_embd, './pickles/glove_embd.pickle')
+
 
 def train(data, model, optimizer, loss_fn, n_epoch=5, start_epoch=0, batch_size=32):
     print('Training starts from', start_epoch, 'to', n_epoch)
@@ -129,20 +147,19 @@ def test(data, model, batch_size=32):
         model.zero_grad()
         loss.backward()
         optimizer.step()
-    
+
         _, preds = torch.max(outs, 1)
         for pred, label in zip(preds, labels):
-            if pred.data[0] == label.data[0]: 
+            if pred.data[0] == label.data[0]:
                 correct += 1
         total += batch_size
-    print('Test Acc', correct/total, correct, '/', total)
-    
+    print('Test Acc: {:.2f}% ({}/{})'.format(correct/total, correct, '/', total))
+
 # model = JNet(args)
 model = MatchLSTM(args)
 # model = SimpleNet(args)
-optimizer = torch.optim.Adamax(filter(lambda p: p.requires_grad, model.parameters()))#, lr=0.01)
+optimizer = torch.optim.Adamax(filter(lambda p: p.requires_grad, model.parameters()))
 loss_fn = nn.NLLLoss()
-# loss_fn = nn.CrossEntropyLoss()
 
 if args.resume:
     if os.path.isfile(args.resume):
@@ -168,4 +185,3 @@ if torch.cuda.is_available():
 test(dev_data, model)
 
 print('fin')
-
