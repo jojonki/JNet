@@ -55,12 +55,18 @@ parser.add_argument('--start_epoch',
                     type=int,
                     default=0,
                     help='initial epoch count')
+parser.add_argument('--test',
+                    type=int,
+                    default=0,
+                    help='only run test() if 1')
 parser.add_argument('--resume',
                     type=str,
                     default='./model_best.tar',
                     metavar='PATH',
                     help='path to latest checkpoint (default: none)')
 args = parser.parse_args()
+for arg in vars(args):
+    print('Argument:', arg, getattr(args, arg))
 
 train_data = load_processed_data('./dataset/train.txt')
 dev_data = load_processed_data('./dataset/dev.txt')
@@ -89,8 +95,10 @@ save_pickle(args.pre_embd, './pickles/glove_embd.pickle')
 
 def train(data, model, optimizer, loss_fn, n_epoch=5, start_epoch=0, batch_size=32):
     debug_log('Training starts from {} to {}'.format(start_epoch, 'to', n_epoch))
+    losses = {}
     for epoch in range(start_epoch, n_epoch):
         debug_log('---Epoch {}'.format(epoch))
+        losses[str(epoch)] = []
         random.shuffle(data)
         # start = time.time()
         for i in tqdm(range(0, len(data)-batch_size, batch_size)): # TODO use last elms
@@ -113,12 +121,11 @@ def train(data, model, optimizer, loss_fn, n_epoch=5, start_epoch=0, batch_size=
             outs = outs.squeeze()
             # outs = outs.view(-1, ctx_token_maxlen).contiguous() #(B*M, L)
             # outs = outs.view(-1, ctx_token_maxlen) #(B*M, L)
-#             print('preds', torch.max(outs, 1)[1])
             labels = labels.view(-1) # (B*M)
             loss = loss_fn(outs, labels)
             if i % (batch_size*10) == 0:
-                # print('outs[0]', outs[0][:100])
-                print(loss.data)
+                print('Loss:', loss.data[0])
+                losses[str(epoch)].append(loss.data[0])
             model.zero_grad()
             loss.backward()
             optimizer.step()
@@ -140,7 +147,7 @@ def train(data, model, optimizer, loss_fn, n_epoch=5, start_epoch=0, batch_size=
 def test(data, model, batch_size=32):
     correct = 0
     total = 0
-    debug_log('Start test')
+    debug_log('Test starts')
     for i in tqdm(range(0, len(data)-batch_size, batch_size)):  # TODO last elms
         batch_data = data[i:i+batch_size]
         c = [d[0] for d in batch_data]
@@ -157,7 +164,7 @@ def test(data, model, batch_size=32):
         loss = loss_fn(outs, labels)
         if i % (batch_size*10) == 0:
             # print('outs[0]', outs[0][:100])
-            print(loss.data)
+            print(loss.data[0])
         model.zero_grad()
         loss.backward()
         optimizer.step()
@@ -195,7 +202,9 @@ if torch.cuda.is_available():
 # for p in model.parameters():
 #     print(p)
 
-train(train_data, model, optimizer, loss_fn, args.n_epoch, args.start_epoch)
+if args.test != 1:
+    train(train_data, model, optimizer, loss_fn, args.n_epoch, args.start_epoch)
+
 test(dev_data, model)
 
 debug_log('Finish')
