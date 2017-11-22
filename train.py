@@ -3,13 +3,14 @@ import shutil
 import pickle
 import argparse
 import time
+from datetime import datetime
 import random
 from tqdm import tqdm
 
 import torch
 import torch.nn as nn
 
-from process_data import save_pickle, load_pickle, load_processed_data,  load_glove_weights, to_var, make_word_vector
+from process_data import save_pickle, load_pickle, load_processed_data, load_glove_weights, to_var, make_word_vector
 # from jnet import JNet
 # from simple_net import SimpleNet
 from match_lstm import MatchLSTM
@@ -20,6 +21,14 @@ def save_checkpoint(state, is_best, filename='checkpoint.tar', best_filename='mo
     torch.save(state, filename)
     if is_best:
         shutil.copyfile(filename, best_filename)
+
+
+def debug_log(text=''):
+    msg = datetime.now().strftime("%Y/%m/%d %H:%M:%S")
+    if text:
+        msg += ': ' + text
+    print(msg)
+
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--batch_size',
@@ -42,13 +51,16 @@ parser.add_argument('--n_epoch',
                     type=int,
                     default=10,
                     help='number of epochs')
+parser.add_argument('--start_epoch',
+                    type=int,
+                    default=0,
+                    help='initial epoch count')
 parser.add_argument('--resume',
                     type=str,
                     default='./model_best.tar',
                     metavar='PATH',
                     help='path to latest checkpoint (default: none)')
 args = parser.parse_args()
-args.start_epoch = 0
 
 train_data = load_processed_data('./dataset/train.txt')
 dev_data = load_processed_data('./dataset/dev.txt')
@@ -76,9 +88,9 @@ save_pickle(args.pre_embd, './pickles/glove_embd.pickle')
 
 
 def train(data, model, optimizer, loss_fn, n_epoch=5, start_epoch=0, batch_size=32):
-    print('Training starts from', start_epoch, 'to', n_epoch)
+    debug_log('Training starts from {} to {}'.format(start_epoch, 'to', n_epoch))
     for epoch in range(start_epoch, n_epoch):
-        print('---Epoch', epoch)
+        debug_log('---Epoch {}'.format(epoch))
         random.shuffle(data)
         # start = time.time()
         for i in tqdm(range(0, len(data)-batch_size, batch_size)): # TODO use last elms
@@ -110,13 +122,13 @@ def train(data, model, optimizer, loss_fn, n_epoch=5, start_epoch=0, batch_size=
             model.zero_grad()
             loss.backward()
             optimizer.step()
-        
+
         _, preds = torch.max(outs, 1)
         ct = 0
         for pred, label in zip(preds, labels):
-            if pred.data[0] == label.data[0]: 
-                ct+=1
-        print('Acc', ct, '/', len(preds))
+            if pred.data[0] == label.data[0]:
+                ct += 1
+        debug_log('Current Acc: {:.2f}% ({}/{})'.format(ct/len(preds), ct, len(preds)))
 
         save_checkpoint({
             'epoch': epoch + 1,
@@ -124,9 +136,11 @@ def train(data, model, optimizer, loss_fn, n_epoch=5, start_epoch=0, batch_size=
             'optimizer' : optimizer.state_dict(),
         }, is_best=True)
 
+
 def test(data, model, batch_size=32):
     correct = 0
     total = 0
+    debug_log('Start test')
     for i in tqdm(range(0, len(data)-batch_size, batch_size)):  # TODO last elms
         batch_data = data[i:i+batch_size]
         c = [d[0] for d in batch_data]
@@ -153,7 +167,7 @@ def test(data, model, batch_size=32):
             if pred.data[0] == label.data[0]:
                 correct += 1
         total += batch_size
-    print('Test Acc: {:.2f}% ({}/{})'.format(correct/total, correct, '/', total))
+    print('Test Acc: {:.2f}% ({}/{})'.format(correct/total, correct, total))
 
 # model = JNet(args)
 model = MatchLSTM(args)
@@ -181,7 +195,7 @@ if torch.cuda.is_available():
 # for p in model.parameters():
 #     print(p)
 
-# train(train_data, model, optimizer, loss_fn, args.n_epoch, args.start_epoch)
+train(train_data, model, optimizer, loss_fn, args.n_epoch, args.start_epoch)
 test(dev_data, model)
 
-print('fin')
+debug_log('Finish')
