@@ -27,9 +27,11 @@ parser.add_argument('--batch_size', type=int, default=8, help='input batch size'
 parser.add_argument('--embd_size', type=int, default=100, help='word embedding size')
 parser.add_argument('--hidden_size', type=int, default=150, help='word embedding size')
 parser.add_argument('--use_pickles', type=int, default=1, help='use pickles for dataset')
+parser.add_argument('--n_epoch', type=int, default=10, help='number of epochs')
 parser.add_argument('--resume', default='./model_best.tar', type=str, metavar='PATH',
                     help='path to latest checkpoint (default: none)')
 args = parser.parse_args()
+args.start_epoch = 0
 
 train_data = load_processed_data('./dataset/train.txt')
 # dev_data = load_processed_data('./dataset/dev.txt')
@@ -56,8 +58,9 @@ args.pre_embd = load_pickle('./pickles/glove_embd.pickle')
 # args.pre_embd = torch.from_numpy(load_glove_weights('./dataset', args.embd_size, len(vocab), w2i)).type(torch.FloatTensor)
 # save_pickle(args.pre_embd, './pickles/glove_embd.pickle')
 
-def train(data, model, optimizer, loss_fn, n_epoch=5, batch_size=32):
-    for epoch in range(n_epoch):
+def train(data, model, optimizer, loss_fn, n_epoch=5, start_epoch=0, batch_size=32):
+    print('Training starts from', start_epoch, 'to', n_epoch)
+    for epoch in range(start_epoch, n_epoch):
         print('---Epoch', epoch)
         random.shuffle(data)
         # start = time.time()
@@ -130,5 +133,5 @@ if torch.cuda.is_available():
 #     print(p)
 loss_fn = nn.NLLLoss()
 # loss_fn = nn.CrossEntropyLoss()
-train(train_data, model, optimizer, loss_fn)
+train(train_data, model, optimizer, loss_fn, args.n_epoch, args.start_epoch)
 print('fin')
