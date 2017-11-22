@@ -9,11 +9,8 @@ class PointerNetwork(nn.Module):
 
         self.hidden_size = hidden_size
         self.weight_size = weight_size 
-        # self.input_seq_len = input_seq_len
         self.answer_seq_len = answer_seq_len
-        # self.emb_size = emb_size 
 
-        # self.emb = nn.Embedding(input_size, emb_size)  # embed inputs
         self.enc = nn.LSTM(hidden_size, hidden_size, batch_first=True)  # TODO bidirectional
         self.dec = nn.LSTMCell(hidden_size, hidden_size)
         self.W1 = nn.Linear(hidden_size, weight_size) # blending encoder
