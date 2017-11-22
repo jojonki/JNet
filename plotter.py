@@ -2,13 +2,17 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-def plot_heat_matrix(context, query, attn_data, fig_size=(15, 55), output_file='attention_matrix.pdf', scale=10.0, flip=False):
-    data = attn_data.cpu().data.numpy()
-    data = data[:len(context), :len(query)]
-    data *= scale # for vivid color
+def plot_heat_matrix(context, query, attn_data, ans_pair, fig_size=[15, 55], output_file='attention_matrix.pdf', scale=10.0):
     '''
         data: (x, y) # (context_len, query_len)
     '''
+
+    data = attn_data.cpu().data.numpy()
+    data = data[:len(context), :len(query)]
+    data *= scale # for vivid color
+    # ans_pair = [ans_pair[0].cpu().data[0], ans_pair[1].cpu().data[0]]
+
+    fig_size[1] = max(fig_size[1], int(fig_size[1] * len(context)/200)) # TODO Hard code
 
     # https://stackoverflow.com/questions/14391959/heatmap-in-matplotlib-with-pcolor
     fig, ax = plt.subplots()
@@ -44,6 +48,9 @@ def plot_heat_matrix(context, query, attn_data, fig_size=(15, 55), output_file='
     for t in ax.yaxis.get_major_ticks():
         t.tick1On = False
         t.tick2On = False
+
+    # change label color
+    [t.set_color('red') for (i, t) in enumerate(ax.yaxis.get_ticklabels()) if i>=ans_pair[0] and i<ans_pair[1]]
 
     # plt.show()
 
