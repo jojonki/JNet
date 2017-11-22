@@ -129,7 +129,8 @@ def train(data, model, optimizer, loss_fn, n_epoch=5, start_epoch=0, batch_size=
             outs, attens = model(context_var, query_var) # (B, M, L), (B, L, J)
 
             save_fig_file = '{}/{}_output_bs-{}_epoch-{}.png'.format(args.output_dir, now(), i, epoch)
-            plot_heat_matrix(c[0], q[0], attens[0], output_file=save_fig_file)
+            ans = batch_data[0][2]
+            plot_heat_matrix(c[0], q[0], attens[0], ans, output_file=save_fig_file)
 
             # outs = outs.view(ctx_token_maxlen, -1).t().contiguous() # (B*M, L)
             outs = outs.squeeze()
