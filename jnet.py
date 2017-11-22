@@ -19,7 +19,6 @@ class JNet(nn.Module):
         self.query_birnn = nn.ModuleList([nn.GRU(self.embd_size, h_emb, bidirectional=True, dropout=0.2) for _ in range(2)])
         self.last_rnn = nn.GRU(self.embd_size, self.embd_size, bidirectional=True, dropout=0.2)
         
-        # self.ptr_net = PointerNetwork(self.embd_size*2, self.embd_size*2, args.ctx_token_maxlen, self.answer_token_len) # TBD
         self.ptr_net = PointerNetwork(self.embd_size, self.embd_size, self.answer_token_len) # TBD
 
         self.w = nn.Parameter(torch.rand(1, self.embd_size).type(torch.FloatTensor), requires_grad = True) # (1, d)
