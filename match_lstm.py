@@ -17,7 +17,7 @@ class MatchLSTM(nn.Module):
     '''
     def __init__(self, args):
         super(MatchLSTM, self).__init__()
-        initrange = 0.1
+        initrange = 0.5
         self.initrange = initrange
 
         self.embd_size        = args.embd_size
@@ -77,6 +77,7 @@ class MatchLSTM(nn.Module):
         h_r   = to_var(torch.zeros([bs, h])) # (N, h)
         h_r_r = to_var(torch.zeros([bs, h])) # (N, h)
         H_r   = [torch.cat((h_r, h_r_r), 1)] # [(N, 2h)]
+        attns = []
         for i in range(T):
             j = T - 1 - i # reverse index
 
@@ -95,6 +96,7 @@ class MatchLSTM(nn.Module):
 
             attn_bias = self.attn_bias.expand(bs, J)
             attn_i   = F.softmax(torch.bmm(G[:, i, :, :].clone(), self.w.expand(bs, h, 1)).squeeze() + attn_bias ) # (N, J)
+            attns.append(attn_i)
             attn_i_r = F.softmax(torch.bmm(G_r[:, j, :, :].clone(), self.w.expand(bs, h, 1)).squeeze() + attn_bias) # (N, J)
             attn_query   = torch.bmm(attn_i.unsqueeze(1),   embd_query).squeeze() # (N, h) = (N, 1, J)(N, J, H)
             attn_query_r = torch.bmm(attn_i_r.unsqueeze(1), embd_query).squeeze() # (N, h) = (N, 1, J)(N, J, H)
@@ -105,6 +107,7 @@ class MatchLSTM(nn.Module):
             h_r_r  = self.match_lstm_cell_r(z_r, h_r_r) # (N, h)
             H_r.append(torch.cat((h_r, h_r_r), 1)) # [(N, 2h)]
         H_r = torch.stack(H_r, dim=1) # (N, T, 2h)
+        attns = torch.stack(attns, dim=1) # (N, T, J)
 
         indices = self.ptr_net(H_r) # (N, M, T) , M means (start, end)
-        return indices
+        return indices, attns

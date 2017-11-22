@@ -2,19 +2,17 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-def plot_heat_matrix(context, query, data, fig_size=(15, 55), flip=False):
-    print('context', len(context))
-    print('query', len(query))
-    print('data', data.shape)
+def plot_heat_matrix(context, query, attn_data, fig_size=(15, 55), output_file='attention_matrix.pdf', scale=10.0, flip=False):
+    data = attn_data.cpu().data.numpy()
     data = data[:len(context), :len(query)]
-    print(data)
+    data *= scale # for vivid color
     '''
         data: (x, y) # (context_len, query_len)
     '''
 
     # https://stackoverflow.com/questions/14391959/heatmap-in-matplotlib-with-pcolor
     fig, ax = plt.subplots()
-    heatmap = ax.pcolor(data, cmap=plt.cm.Blues, alpha=0.8)
+    ax.pcolor(data, cmap=plt.cm.Blues, alpha=0.8)
 
     # Format
     fig = plt.gcf()
@@ -46,4 +44,8 @@ def plot_heat_matrix(context, query, data, fig_size=(15, 55), flip=False):
     for t in ax.yaxis.get_major_ticks():
         t.tick1On = False
         t.tick2On = False
-    plt.show()
+
+    # plt.show()
+
+    print('Save attention figure', output_file)
+    plt.savefig(output_file)

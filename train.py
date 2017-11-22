@@ -14,6 +14,7 @@ from process_data import save_pickle, load_pickle, load_processed_data, load_glo
 # from jnet import JNet
 # from simple_net import SimpleNet
 from match_lstm import MatchLSTM
+from plotter import plot_heat_matrix
 
 
 def save_checkpoint(state, is_best, filename='checkpoint.tar', best_filename='model_best.tar'):
@@ -23,8 +24,12 @@ def save_checkpoint(state, is_best, filename='checkpoint.tar', best_filename='mo
         shutil.copyfile(filename, best_filename)
 
 
+def now():
+    return datetime.now().strftime("%Y-%m-%d_%H%M%S")
+
+
 def debug_log(text=''):
-    msg = datetime.now().strftime("%Y/%m/%d %H:%M:%S")
+    msg = now()
     if text:
         msg += ': ' + text
     print(msg)
@@ -47,14 +52,14 @@ parser.add_argument('--use_pickles',
                     type=int,
                     default=1,
                     help='use pickles for dataset')
+parser.add_argument('--start_epoch',
+                    type=int,
+                    default=1,
+                    help='initial epoch count')
 parser.add_argument('--n_epoch',
                     type=int,
                     default=10,
                     help='number of epochs')
-parser.add_argument('--start_epoch',
-                    type=int,
-                    default=0,
-                    help='initial epoch count')
 parser.add_argument('--test',
                     type=int,
                     default=0,
@@ -62,6 +67,11 @@ parser.add_argument('--test',
 parser.add_argument('--resume',
                     type=str,
                     default='./model_best.tar',
+                    metavar='PATH',
+                    help='path to latest checkpoint (default: none)')
+parser.add_argument('--output_dir',
+                    type=str,
+                    default='./outputs',
                     metavar='PATH',
                     help='path to latest checkpoint (default: none)')
 args = parser.parse_args()
@@ -96,7 +106,7 @@ save_pickle(args.pre_embd, './pickles/glove_embd.pickle')
 def train(data, model, optimizer, loss_fn, n_epoch=5, start_epoch=0, batch_size=32):
     debug_log('Training starts from {} to {}'.format(start_epoch, 'to', n_epoch))
     losses = {}
-    for epoch in range(start_epoch, n_epoch):
+    for epoch in range(start_epoch, n_epoch+1):
         debug_log('---Epoch {}'.format(epoch))
         losses[str(epoch)] = []
         random.shuffle(data)
@@ -116,20 +126,25 @@ def train(data, model, optimizer, loss_fn, n_epoch=5, start_epoch=0, batch_size=
             query_var   = make_word_vector(q, w2i, b_query_token_maxlen)
             labels = [d[2][0] for d in batch_data]
             labels = to_var(torch.LongTensor(labels))
-            outs = model(context_var, query_var) # (B, M, L)
+            outs, attens = model(context_var, query_var) # (B, M, L), (B, L, J)
+
+            save_fig_file = '{}/{}_output_bs-{}_epoch-{}.png'.format(args.output_dir, now(), i, epoch)
+            plot_heat_matrix(c[0], q[0], attens[0], output_file=save_fig_file)
+
             # outs = outs.view(ctx_token_maxlen, -1).t().contiguous() # (B*M, L)
             outs = outs.squeeze()
             # outs = outs.view(-1, ctx_token_maxlen).contiguous() #(B*M, L)
             # outs = outs.view(-1, ctx_token_maxlen) #(B*M, L)
             labels = labels.view(-1) # (B*M)
             loss = loss_fn(outs, labels)
-            if i % (batch_size*10) == 0:
+            if i % (batch_size*1) == 0:
                 print('Loss:', loss.data[0])
                 losses[str(epoch)].append(loss.data[0])
             model.zero_grad()
             loss.backward()
             optimizer.step()
 
+        # end epoch
         _, preds = torch.max(outs, 1)
         ct = 0
         for pred, label in zip(preds, labels):
@@ -142,6 +157,8 @@ def train(data, model, optimizer, loss_fn, n_epoch=5, start_epoch=0, batch_size=
             'state_dict': model.state_dict(),
             'optimizer' : optimizer.state_dict(),
         }, is_best=True)
+
+    save_pickle(losses, '{}/{}_train_losses.pickle'.format(args.output_dir, now()))
 
 
 def test(data, model, batch_size=32):
@@ -158,7 +175,7 @@ def test(data, model, batch_size=32):
         query_var   = make_word_vector(q, w2i, b_query_token_maxlen)
         labels = [d[2][0] for d in batch_data]
         labels = to_var(torch.LongTensor(labels))
-        outs = model(context_var, query_var) # (B, M, L)
+        outs, attens = model(context_var, query_var) # (B, M, L), (B, L, J)
         outs = outs.squeeze()
         labels = labels.view(-1) # (B*M)
         loss = loss_fn(outs, labels)
@@ -205,6 +222,6 @@ if torch.cuda.is_available():
 if args.test != 1:
     train(train_data, model, optimizer, loss_fn, args.n_epoch, args.start_epoch)
 
-test(dev_data, model)
+# test(dev_data, model)
 
 debug_log('Finish')
