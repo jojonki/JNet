@@ -17,7 +17,7 @@ from match_lstm import MatchLSTM
 from plotter import plot_heat_matrix
 
 
-def save_checkpoint(state, is_best, filename='checkpoint.tar', best_filename='model_best.tar'):
+def save_checkpoint(state, is_best, filename='checkpoint.model', best_filename='model_best.model'):
     print('save_model', filename, best_filename)
     torch.save(state, filename)
     if is_best:
@@ -66,14 +66,13 @@ parser.add_argument('--test',
                     help='only run test() if 1')
 parser.add_argument('--resume',
                     type=str,
-                    default='./model_best.tar',
-                    metavar='PATH',
-                    help='path to latest checkpoint (default: none)')
+                    default='best.model',
+                    help='path to latest checkpoint')
 parser.add_argument('--output_dir',
                     type=str,
                     default='./outputs',
                     metavar='PATH',
-                    help='path to latest checkpoint (default: none)')
+                    help='path to latest checkpoint')
 args = parser.parse_args()
 for arg in vars(args):
     print('Argument:', arg, getattr(args, arg))
@@ -128,19 +127,19 @@ def train(data, model, optimizer, loss_fn, n_epoch=5, start_epoch=0, batch_size=
             labels = to_var(torch.LongTensor(labels))
             outs, attens = model(context_var, query_var) # (B, M, L), (B, L, J)
 
-            save_fig_file = '{}/{}_output_bs-{}_epoch-{}.png'.format(args.output_dir, now(), i, epoch)
-            ans = batch_data[0][2]
-            plot_heat_matrix(c[0], q[0], attens[0], ans, output_file=save_fig_file)
-
             # outs = outs.view(ctx_token_maxlen, -1).t().contiguous() # (B*M, L)
             outs = outs.squeeze()
             # outs = outs.view(-1, ctx_token_maxlen).contiguous() #(B*M, L)
             # outs = outs.view(-1, ctx_token_maxlen) #(B*M, L)
             labels = labels.view(-1) # (B*M)
             loss = loss_fn(outs, labels)
-            if i % (batch_size*1) == 0:
-                print('Loss:', loss.data[0])
+            if i % (batch_size*5) == 0:
+                print('Epoch', epoch, ', Loss:', loss.data[0])
                 losses[str(epoch)].append(loss.data[0])
+                save_fig_file = '{}/{}_output_bs-{}_epoch-{}.png'.format(args.output_dir, now(), i, epoch)
+                ans = batch_data[0][2]
+                plot_heat_matrix(c[0], q[0], attens[0], ans, output_file=save_fig_file)
+
             model.zero_grad()
             loss.backward()
             optimizer.step()
@@ -153,11 +152,12 @@ def train(data, model, optimizer, loss_fn, n_epoch=5, start_epoch=0, batch_size=
                 ct += 1
         debug_log('Current Acc: {:.2f}% ({}/{})'.format(ct/len(preds), ct, len(preds)))
 
+        filename = '{}/{}_Epoch-{}.model'.format(args.output_dir, now(), epoch)
         save_checkpoint({
             'epoch': epoch + 1,
             'state_dict': model.state_dict(),
             'optimizer' : optimizer.state_dict(),
-        }, is_best=True)
+        }, is_best=True, filename=filename)
 
     save_pickle(losses, '{}/{}_train_losses.pickle'.format(args.output_dir, now()))
 
