@@ -133,7 +133,7 @@ def train(data, model, optimizer, loss_fn, n_epoch=5, start_epoch=0, batch_size=
             # outs = outs.view(-1, ctx_token_maxlen) #(B*M, L)
             labels = labels.view(-1) # (B*M)
             loss = loss_fn(outs, labels)
-            if i % (batch_size*5) == 0:
+            if i % (batch_size*10) == 0:
                 print('Epoch', epoch, ', Loss:', loss.data[0])
                 losses[str(epoch)].append(loss.data[0])
                 save_fig_file = '{}/{}_output_bs-{}_epoch-{}.png'.format(args.output_dir, now(), i, epoch)
