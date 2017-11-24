@@ -99,10 +99,11 @@ args.answer_token_len = 1 # 2 TODO
 
 # args.pre_embd = load_pickle('./pickles/glove_embd.pickle')
 args.pre_embd = torch.from_numpy(load_glove_weights('./dataset', args.embd_size, len(vocab), w2i)).type(torch.FloatTensor)
-save_pickle(args.pre_embd, './pickles/glove_embd.pickle')
+# save_pickle(args.pre_embd, './pickles/glove_embd.pickle')
 
 
 def train(data, model, optimizer, loss_fn, n_epoch=5, start_epoch=0, batch_size=32):
+    model.train()
     debug_log('Training starts from {} to {}'.format(start_epoch, 'to', n_epoch))
     losses = {}
     for epoch in range(start_epoch, n_epoch+1):
@@ -163,6 +164,7 @@ def train(data, model, optimizer, loss_fn, n_epoch=5, start_epoch=0, batch_size=
 
 
 def test(data, model, batch_size=32):
+    model.eval()
     correct = 0
     total = 0
     debug_log('Test starts')
@@ -183,11 +185,12 @@ def test(data, model, batch_size=32):
         if i % (batch_size*10) == 0:
             # print('outs[0]', outs[0][:100])
             print(loss.data[0])
-        model.zero_grad()
-        loss.backward()
-        optimizer.step()
+            save_fig_file = '{}/{}_TEST_output_bs-{}.png'.format(args.output_dir, now(), i)
+            ans = batch_data[0][2]
+            plot_heat_matrix(c[0], q[0], attens[0], ans, output_file=save_fig_file)
 
         _, preds = torch.max(outs, 1)
+        # correct += torch.sum(outs, labels).data[0]
         for pred, label in zip(preds, labels):
             if pred.data[0] == label.data[0]:
                 correct += 1
@@ -223,6 +226,6 @@ if torch.cuda.is_available():
 if args.test != 1:
     train(train_data, model, optimizer, loss_fn, args.n_epoch, args.start_epoch)
 
-# test(dev_data, model)
+test(dev_data, model)
 
 debug_log('Finish')
