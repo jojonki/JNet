@@ -4,15 +4,15 @@ matplotlib.use('agg')
 import matplotlib.pyplot as plt
 
 
-def plot_heat_matrix(context, query, attn_data, ans_pair, fig_size=[15, 60], output_file='attention_matrix.png'):
+def plot_heat_matrix(context, query, attn_data, ans_pair, fig_size=[60, 15], output_file='attention_matrix.png'):
     '''
         data: (x, y) # (context_len, query_len)
     '''
     scale = 10.0
     data = attn_data.cpu().data.numpy()
-    data = data[:len(context), :len(query)]
+    data = data[:len(context), :len(query)] # remove zero padding
+    data = data.T
     data *= scale # for vivid color
-    # ans_pair = [ans_pair[0].cpu().data[0], ans_pair[1].cpu().data[0]]
 
     # fig_size[1] = max(fig_size[1], int(fig_size[1] * len(context)/300)) # TODO Hard code
 
@@ -33,11 +33,11 @@ def plot_heat_matrix(context, query, attn_data, ans_pair, fig_size=[15, 60], out
 
     # want a more natural, table-like display
     ax.invert_yaxis()
-    ax.xaxis.tick_top()
+    # ax.xaxis.tick_top()
 
     # Set the labels
-    ax.set_xticklabels(query, minor=False)
-    ax.set_yticklabels(context, minor=False)
+    ax.set_xticklabels(context, minor=False)
+    ax.set_yticklabels(query, minor=False)
     plt.xticks(rotation=90)
 
     ax.grid(False)
@@ -52,7 +52,7 @@ def plot_heat_matrix(context, query, attn_data, ans_pair, fig_size=[15, 60], out
         t.tick2On = False
 
     # change label color
-    [t.set_color('red') for (i, t) in enumerate(ax.yaxis.get_ticklabels()) if i >= ans_pair[0] and i <= ans_pair[1]]
+    [t.set_color('red') for (i, t) in enumerate(ax.xaxis.get_ticklabels()) if i >= ans_pair[0] and i <= ans_pair[1]]
     # plt.title('answer ids=[{}:{}]'.format(ans_pair[0], ans_pair[1]))
 
     # plt.show()
