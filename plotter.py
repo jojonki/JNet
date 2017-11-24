@@ -59,3 +59,4 @@ def plot_heat_matrix(context, query, attn_data, ans_pair, fig_size=[15, 60], out
 
     print('Save attention figure', output_file)
     plt.savefig(output_file)
+    plt.close()

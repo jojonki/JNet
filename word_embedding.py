@@ -1,6 +1,6 @@
-import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
 
 # In : (N, sentence_len)
 # Out: (N, sentence_len, embd_size)
@@ -11,7 +11,6 @@ class WordEmbedding(nn.Module):
         if args.pre_embd is not None:
             print('Set pretrained embedding weights')
             self.embedding.weight = nn.Parameter(args.pre_embd, requires_grad=is_train_embd)
-        
+
     def forward(self, x):
         return F.relu(self.embedding(x))
-

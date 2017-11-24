@@ -66,7 +66,7 @@ parser.add_argument('--test',
                     help='only run test() if 1')
 parser.add_argument('--resume',
                     type=str,
-                    default='best.model',
+                    default='model_best.model',
                     help='path to latest checkpoint')
 parser.add_argument('--output_dir',
                     type=str,
