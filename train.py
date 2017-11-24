@@ -84,7 +84,7 @@ vocab = set()
 for ctx, query, _ in data:
     vocab |= set(ctx + query)
 
-vocab = ['<PAD>', '<UNK'] + list(sorted(vocab))
+vocab = ['<PAD>', '<UNK>'] + list(sorted(vocab))
 w2i = dict((w, i) for i, w in enumerate(vocab, 0))
 i2w = dict((i, w) for i, w in enumerate(vocab, 0))
 args.vocab_size = len(vocab)
