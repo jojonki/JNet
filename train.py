@@ -81,7 +81,7 @@ train_data = load_processed_data('./dataset/train.txt')
 dev_data = load_processed_data('./dataset/dev.txt')
 data = train_data + dev_data
 vocab = set()
-for ctx, query, _ in data:
+for ctx, query, _, _ in data:
     vocab |= set(ctx + query)
 
 vocab = ['<PAD>', '<UNK>'] + list(sorted(vocab))
@@ -90,15 +90,15 @@ i2w = dict((i, w) for i, w in enumerate(vocab, 0))
 args.vocab_size = len(vocab)
 print('vocab size', len(vocab))
 
-ctx_token_maxlen = max([len(c) for c, _, _ in data])
-query_token_maxlen = max([len(q) for _, q, _ in data])
+ctx_token_maxlen = max([len(c) for c, _, _, _ in data])
+query_token_maxlen = max([len(q) for _, q, _, _ in data])
 print('ctx_token_maxlen:', ctx_token_maxlen)
 print('query_token_maxlen:', query_token_maxlen)
 args.answer_token_len = 1 # 2 TODO
 
 
-# args.pre_embd = load_pickle('./pickles/glove_embd.pickle')
-args.pre_embd = torch.from_numpy(load_glove_weights('./dataset', args.embd_size, len(vocab), w2i)).type(torch.FloatTensor)
+args.pre_embd = load_pickle('./pickles/glove_embd.pickle')
+# args.pre_embd = torch.from_numpy(load_glove_weights('./dataset', args.embd_size, len(vocab), w2i)).type(torch.FloatTensor)
 # save_pickle(args.pre_embd, './pickles/glove_embd.pickle')
 
 
@@ -172,6 +172,7 @@ def test(data, model, batch_size=32):
         batch_data = data[i:i+batch_size]
         c = [d[0] for d in batch_data]
         q = [d[1] for d in batch_data]
+        a_txt = [d[3] for d in batch_data]
         b_ctx_token_maxlen = max([len(cc) for cc in c])
         b_query_token_maxlen = max([len(qq) for qq in q])
         context_var = make_word_vector(c, w2i, b_ctx_token_maxlen)
@@ -185,16 +186,27 @@ def test(data, model, batch_size=32):
         if i % (batch_size*10) == 0:
             # print('outs[0]', outs[0][:100])
             print(loss.data[0])
-            save_fig_file = '{}/{}_TEST_output_bs-{}.png'.format(args.output_dir, now(), i)
-            ans = batch_data[0][2]
-            plot_heat_matrix(c[0], q[0], attens[0], ans, output_file=save_fig_file)
+            # save_fig_file = '{}/{}_TEST_output_bs-{}.png'.format(args.output_dir, now(), i)
+            # ans = batch_data[0][2]
+            # plot_heat_matrix(c[0], q[0], attens[0], ans, output_file=save_fig_file)
 
         _, preds = torch.max(outs, 1)
         # correct += torch.sum(outs, labels).data[0]
-        for pred, label in zip(preds, labels):
+        already_saved = False
+        for j, (pred, label) in enumerate(zip(preds, labels)):
             if pred.data[0] == label.data[0]:
                 correct += 1
+                save_fig_file = '{}/{}_TEST_output_bs-{}_correct{}.png'.format(args.output_dir, now(), i, j)
+            else:
+                save_fig_file = '{}/{}_TEST_output_bs-{}_wrong{}.png'.format(args.output_dir, now(), i, j)
+            ans = batch_data[j][2]
+            if not already_saved:
+                test_img_data = (c[j], q[j], attens[j], ans, save_fig_file)
+                save_pickle(test_img_data, 'test_img_data.pickle')
+                plot_heat_matrix(c[j], q[j], attens[j], ans, output_file=save_fig_file, title=a_txt[j])
+            already_saved = True
         total += batch_size
+        break
     print('Test Acc: {:.2f}% ({}/{})'.format(correct/total, correct, total))
 
 # model = JNet(args)

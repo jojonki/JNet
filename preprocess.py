@@ -1,11 +1,11 @@
 import json
-import numpy as np
 from nltk.tokenize import word_tokenize
 from tqdm import tqdm
 
 
 def lower_list(str_list):
     return [str_var.lower() for str_var in str_list]
+
 
 def preprocess(fpath_read, fpath_write):
     count = 0
@@ -15,9 +15,9 @@ def preprocess(fpath_read, fpath_write):
         fpw   = open(fpath_write, 'w')
         for c in tqdm(data["data"]):
             for p in c["paragraphs"]:
-                context      = p["context"].split(' ')
-                context_char = list(p["context"])
-                context_pos  = {}
+                # context      = p["context"].split(' ')
+                # context_char = list(p["context"])
+                # context_pos  = {}
                 for qa in p["qas"]:
                     question = word_tokenize(qa["question"])
 
@@ -25,7 +25,7 @@ def preprocess(fpath_read, fpath_write):
                     answer = a['text'].strip()
                     answer_start = int(a['answer_start'])
 
-                    #add '.' here, just because NLTK is not good enough in some cases
+                    # add '.' here, just because NLTK is not good enough in some cases
                     answer_words = word_tokenize(answer+'.')
                     # answer_words = word_tokenize(answer)
                     if answer_words[-1] == '.':
@@ -37,7 +37,7 @@ def preprocess(fpath_read, fpath_write):
                     right_context = word_tokenize( p["context"][answer_start:] )
                     answer_reproduce = []
                     for i in range(len(answer_words)):
-                        assert(i<len(right_context))
+                        assert(i < len(right_context))
                         answer_reproduce.append( right_context[i] )
                     join_a  = ' '.join(answer_words)
                     join_ar = ' '.join(answer_reproduce)
@@ -54,7 +54,7 @@ def preprocess(fpath_read, fpath_write):
 
                     answer_seq = []
                     for i in range(len(answer_words)):
-                        assert(i<len(right_context))
+                        assert(i < len(right_context))
                         # answer_seq.append(str(len(left_context)+i+1))
                         answer_seq.append(str(len(left_context)+i))
                     if len(answer_seq) == 0:
@@ -62,9 +62,10 @@ def preprocess(fpath_read, fpath_write):
                         print('join_a', join_a)
                         print('answer:'+answer)
                     assert(len(answer_seq) > 0)
-                    fpw.write(' '.join(answer_seq)+'\n')
+                    fpw.write(' '.join(answer_seq)+'\t')
+                    fpw.write(answer+'\n')
 
         fpw.close()
 preprocess('./dataset/train-v1.1.json', './dataset/train.txt')
 preprocess('./dataset/dev-v1.1.json', './dataset/dev.txt')
-print ('SQuAD preprossing finished!')
+print('SQuAD preprossing finished!')

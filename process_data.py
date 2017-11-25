@@ -28,13 +28,13 @@ def load_processed_data(fpath):
         lines = f.readlines()
         data = []
         for l in lines:
-            c, q, a = l.rstrip().split('\t')
+            c, q, a, a_txt = l.rstrip().split('\t')
             c, q, a = c.split(' '), q.split(' '), a.split(' ')
             # if len(c) > 30: continue # TMP
             c, q = lower_list(c), lower_list(q)
             a = [int(aa) for aa in a]
             a = [a[0], a[-1]]
-            data.append((c, q, a))
+            data.append((c, q, a, a_txt))
     return data
 
 
