@@ -13,13 +13,15 @@ def preprocess(fpath_read, fpath_write):
         data = fs.read()
         data = json.loads(data)
         fpw   = open(fpath_write, 'w')
-        for c in tqdm(data["data"]):
-            for p in c["paragraphs"]:
-                # context      = p["context"].split(' ')
-                # context_char = list(p["context"])
+        for c in tqdm(data['data']):
+            title = c['title']
+            for i, p in enumerate(c['paragraphs']):
+                # context      = p['context'].split(' ')
+                # context_char = list(p['context'])
                 # context_pos  = {}
-                for qa in p["qas"]:
-                    question = word_tokenize(qa["question"])
+                context_label = title + '#' + str(i)
+                for qa in p['qas']:
+                    question = word_tokenize(qa['question'])
 
                     a = qa['answers'][0] # TODO multiple labels
                     answer = a['text'].strip()
@@ -33,8 +35,8 @@ def preprocess(fpath_read, fpath_write):
                     else:
                         answer_words = word_tokenize(answer)
 
-                    left_context  = word_tokenize( p["context"][0:answer_start] )
-                    right_context = word_tokenize( p["context"][answer_start:] )
+                    left_context  = word_tokenize( p['context'][0:answer_start] )
+                    right_context = word_tokenize( p['context'][answer_start:] )
                     answer_reproduce = []
                     for i in range(len(answer_words)):
                         assert(i < len(right_context))
@@ -49,8 +51,9 @@ def preprocess(fpath_read, fpath_write):
                         count += 1
                         print('current different count:', count)
 
-                    fpw.write(' '.join(left_context+right_context)+'\t')
-                    fpw.write(' '.join(question)+'\t')
+                    fpw.write(context_label + '\t')
+                    fpw.write(' '.join(left_context+right_context) + '\t')
+                    fpw.write(' '.join(question) + '\t')
 
                     answer_seq = []
                     for i in range(len(answer_words)):
@@ -62,8 +65,8 @@ def preprocess(fpath_read, fpath_write):
                         print('join_a', join_a)
                         print('answer:'+answer)
                     assert(len(answer_seq) > 0)
-                    fpw.write(' '.join(answer_seq)+'\t')
-                    fpw.write(answer+'\n')
+                    fpw.write(' '.join(answer_seq) + '\t')
+                    fpw.write(answer + '\n')
 
         fpw.close()
 preprocess('./dataset/train-v1.1.json', './dataset/train.txt')

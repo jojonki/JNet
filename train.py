@@ -81,7 +81,7 @@ train_data = load_processed_data('./dataset/train.txt')
 dev_data = load_processed_data('./dataset/dev.txt')
 data = train_data + dev_data
 vocab = set()
-for ctx, query, _, _ in data:
+for _, ctx, query, _, _ in data:
     vocab |= set(ctx + query)
 
 vocab = ['<PAD>', '<UNK>'] + list(sorted(vocab))
@@ -90,8 +90,8 @@ i2w = dict((i, w) for i, w in enumerate(vocab, 0))
 args.vocab_size = len(vocab)
 print('vocab size', len(vocab))
 
-ctx_token_maxlen = max([len(c) for c, _, _, _ in data])
-query_token_maxlen = max([len(q) for _, q, _, _ in data])
+ctx_token_maxlen = max([len(c) for _, c, _, _, _ in data])
+query_token_maxlen = max([len(q) for _, _, q, _, _ in data])
 print('ctx_token_maxlen:', ctx_token_maxlen)
 print('query_token_maxlen:', query_token_maxlen)
 args.answer_token_len = 1 # 2 TODO
@@ -117,14 +117,14 @@ def train(data, model, optimizer, loss_fn, n_epoch=5, start_epoch=0, batch_size=
             # start = time.time()
 
             batch_data = data[i:i+batch_size]
-            c = [d[0] for d in batch_data]
-            q = [d[1] for d in batch_data]
+            c = [d[1] for d in batch_data]
+            q = [d[2] for d in batch_data]
             b_ctx_token_maxlen = max([len(cc) for cc in c])
             b_query_token_maxlen = max([len(qq) for qq in q])
             print('BATCH context maxlen: {}, query maxlen: {}'.format(b_ctx_token_maxlen, b_query_token_maxlen))
             context_var = make_word_vector(c, w2i, b_ctx_token_maxlen)
             query_var   = make_word_vector(q, w2i, b_query_token_maxlen)
-            labels = [d[2][0] for d in batch_data]
+            labels = [d[3][0] for d in batch_data]
             labels = to_var(torch.LongTensor(labels))
             outs, attens = model(context_var, query_var) # (B, M, L), (B, L, J)
 
@@ -137,9 +137,17 @@ def train(data, model, optimizer, loss_fn, n_epoch=5, start_epoch=0, batch_size=
             if i % (batch_size*10) == 0:
                 print('Epoch', epoch, ', Loss:', loss.data[0])
                 losses[str(epoch)].append(loss.data[0])
-                save_fig_file = '{}/{}_output_bs-{}_epoch-{}.png'.format(args.output_dir, now(), i, epoch)
-                ans = batch_data[0][2]
-                plot_heat_matrix(c[0], q[0], attens[0], ans, output_file=save_fig_file)
+
+                _, preds = torch.max(outs, 1)
+                for j, (pred, label) in enumerate(zip(preds, labels)):
+                    c_label = batch_data[j][0]
+                    if pred.data[0] == label.data[0]:
+                        save_fig_file = '{}/{}_TRAIN_{}_bs-{}_correct.png'.format(args.output_dir, now(), c_label, i)
+                    else:
+                        save_fig_file = '{}/{}_TRAIN_{}_bs-{}_wrong.png'.format(args.output_dir, now(), c_label, i)
+                    ans = batch_data[0][3]
+                    plot_heat_matrix(c[0], q[0], attens[0], ans, output_file=save_fig_file)
+                    break # just one sample
 
             model.zero_grad()
             loss.backward()
@@ -170,40 +178,37 @@ def test(data, model, batch_size=32):
     debug_log('Test starts')
     for i in tqdm(range(0, len(data)-batch_size, batch_size)):  # TODO last elms
         batch_data = data[i:i+batch_size]
-        c = [d[0] for d in batch_data]
-        q = [d[1] for d in batch_data]
-        a_txt = [d[3] for d in batch_data]
+        c = [d[1] for d in batch_data]
+        q = [d[2] for d in batch_data]
+        a_txt = [d[4] for d in batch_data]
         b_ctx_token_maxlen = max([len(cc) for cc in c])
         b_query_token_maxlen = max([len(qq) for qq in q])
         context_var = make_word_vector(c, w2i, b_ctx_token_maxlen)
         query_var   = make_word_vector(q, w2i, b_query_token_maxlen)
-        labels = [d[2][0] for d in batch_data]
+        labels = [d[3][0] for d in batch_data]
         labels = to_var(torch.LongTensor(labels))
         outs, attens = model(context_var, query_var) # (B, M, L), (B, L, J)
         outs = outs.squeeze()
         labels = labels.view(-1) # (B*M)
         loss = loss_fn(outs, labels)
         if i % (batch_size*10) == 0:
-            # print('outs[0]', outs[0][:100])
             print(loss.data[0])
-            # save_fig_file = '{}/{}_TEST_output_bs-{}.png'.format(args.output_dir, now(), i)
-            # ans = batch_data[0][2]
-            # plot_heat_matrix(c[0], q[0], attens[0], ans, output_file=save_fig_file)
 
         _, preds = torch.max(outs, 1)
         # correct += torch.sum(outs, labels).data[0]
         already_saved = False
         for j, (pred, label) in enumerate(zip(preds, labels)):
+            c_label = batch_data[j][0]
             if pred.data[0] == label.data[0]:
                 correct += 1
-                save_fig_file = '{}/{}_TEST_output_bs-{}_correct{}.png'.format(args.output_dir, now(), i, j)
+                save_fig_file = '{}/{}_TEST_{}_bs-{}_correct{}.png'.format(args.output_dir, now(), c_label, i, j)
             else:
-                save_fig_file = '{}/{}_TEST_output_bs-{}_wrong{}.png'.format(args.output_dir, now(), i, j)
-            ans = batch_data[j][2]
+                save_fig_file = '{}/{}_TEST_{}_bs-{}_wrong{}.png'.format(args.output_dir, now(), c_label, i, j)
+            ans = batch_data[j][3]
             if not already_saved:
-                test_img_data = (c[j], q[j], attens[j], ans, save_fig_file)
-                save_pickle(test_img_data, 'test_img_data.pickle')
-                plot_heat_matrix(c[j], q[j], attens[j], ans, output_file=save_fig_file, title=a_txt[j])
+                # test_img_data = (c[j], q[j], attens[j], ans, save_fig_file)
+                # save_pickle(test_img_data, 'test_img_data.pickle')
+                plot_heat_matrix(c[j], q[j], attens[j], ans, output_file=save_fig_file, title='Answer: '+a_txt[j])
             already_saved = True
         total += batch_size
         break
