@@ -10,7 +10,8 @@ def plot_heat_matrix(context,
                      ans_pair,
                      fig_size=[60, 15],
                      title='Attention Matrix',
-                     output_file='attention_matrix.png'):
+                     output_file='attention_matrix.png',
+                     pred=None):
     '''
         data: (x, y) # (context_len, query_len)
     '''
@@ -62,6 +63,8 @@ def plot_heat_matrix(context,
         t.tick2On = False
 
     # change label color
+    if pred:
+        [t.set_color('deepskyblue') for (i, t) in enumerate(ax.xaxis.get_ticklabels()) if i == pred]
     [t.set_color('red') for (i, t) in enumerate(ax.xaxis.get_ticklabels()) if i >= ans_pair[0] and i <= ans_pair[1]]
     plt.title(title, fontsize=label_fs, y=1.02)
     plt.tight_layout()

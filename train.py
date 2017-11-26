@@ -58,7 +58,7 @@ parser.add_argument('--start_epoch',
                     help='initial epoch count')
 parser.add_argument('--n_epoch',
                     type=int,
-                    default=10,
+                    default=30,
                     help='number of epochs')
 parser.add_argument('--test',
                     type=int,
@@ -97,8 +97,8 @@ print('query_token_maxlen:', query_token_maxlen)
 args.answer_token_len = 1 # 2 TODO
 
 
-args.pre_embd = load_pickle('./pickles/glove_embd.pickle')
-# args.pre_embd = torch.from_numpy(load_glove_weights('./dataset', args.embd_size, len(vocab), w2i)).type(torch.FloatTensor)
+# args.pre_embd = load_pickle('./pickles/glove_embd.pickle')
+args.pre_embd = torch.from_numpy(load_glove_weights('./dataset', args.embd_size, len(vocab), w2i)).type(torch.FloatTensor)
 # save_pickle(args.pre_embd, './pickles/glove_embd.pickle')
 
 
@@ -119,6 +119,7 @@ def train(data, model, optimizer, loss_fn, n_epoch=5, start_epoch=0, batch_size=
             batch_data = data[i:i+batch_size]
             c = [d[1] for d in batch_data]
             q = [d[2] for d in batch_data]
+            a_txt = [d[4] for d in batch_data]
             b_ctx_token_maxlen = max([len(cc) for cc in c])
             b_query_token_maxlen = max([len(qq) for qq in q])
             print('BATCH context maxlen: {}, query maxlen: {}'.format(b_ctx_token_maxlen, b_query_token_maxlen))
@@ -146,7 +147,7 @@ def train(data, model, optimizer, loss_fn, n_epoch=5, start_epoch=0, batch_size=
                     else:
                         save_fig_file = '{}/{}_TRAIN_{}_bs-{}_wrong.png'.format(args.output_dir, now(), c_label, i)
                     ans = batch_data[0][3]
-                    plot_heat_matrix(c[0], q[0], attens[0], ans, output_file=save_fig_file)
+                    plot_heat_matrix(c[0], q[0], attens[0], ans, output_file=save_fig_file, title='Answer: '+a_txt[0], pred=pred.data[0])
                     break # just one sample
 
             model.zero_grad()
@@ -208,10 +209,9 @@ def test(data, model, batch_size=32):
             if not already_saved:
                 # test_img_data = (c[j], q[j], attens[j], ans, save_fig_file)
                 # save_pickle(test_img_data, 'test_img_data.pickle')
-                plot_heat_matrix(c[j], q[j], attens[j], ans, output_file=save_fig_file, title='Answer: '+a_txt[j])
-            already_saved = True
+                plot_heat_matrix(c[j], q[j], attens[j], ans, output_file=save_fig_file, title='Answer: '+a_txt[j], pred=pred.data[0])
+            # already_saved = True
         total += batch_size
-        break
     print('Test Acc: {:.2f}% ({}/{})'.format(correct/total, correct, total))
 
 # model = JNet(args)
