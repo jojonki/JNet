@@ -210,7 +210,7 @@ def test(data, model, batch_size=32):
                 # test_img_data = (c[j], q[j], attens[j], ans, save_fig_file)
                 # save_pickle(test_img_data, 'test_img_data.pickle')
                 plot_heat_matrix(c[j], q[j], attens[j], ans, output_file=save_fig_file, title='Answer: '+a_txt[j], pred=pred.data[0])
-            # already_saved = True
+            already_saved = True
         total += batch_size
     print('Test Acc: {:.2f}% ({}/{})'.format(correct/total, correct, total))
 
