@@ -1,9 +1,6 @@
 import os
-import shutil
 import pickle
 import argparse
-import time
-from datetime import datetime
 import random
 from tqdm import tqdm
 
@@ -11,28 +8,12 @@ import torch
 import torch.nn as nn
 
 from process_data import save_pickle, load_pickle, load_processed_data, load_glove_weights, to_var, make_word_vector
+from utils import now, save_checkpoint, debug_log
 # from jnet import JNet
 # from simple_net import SimpleNet
 from layers.match_lstm import MatchLSTM
+from layers.attention_net import AttentionNet
 from plotter import plot_heat_matrix
-
-
-def save_checkpoint(state, is_best, filename='checkpoint.model', best_filename='model_best.model'):
-    print('save_model', filename, best_filename)
-    torch.save(state, filename)
-    if is_best:
-        shutil.copyfile(filename, best_filename)
-
-
-def now():
-    return datetime.now().strftime("%Y-%m-%d_%H%M%S")
-
-
-def debug_log(text=''):
-    msg = now()
-    if text:
-        msg += ': ' + text
-    print(msg)
 
 
 parser = argparse.ArgumentParser()
@@ -66,7 +47,8 @@ parser.add_argument('--test',
                     help='only run test() if 1')
 parser.add_argument('--resume',
                     type=str,
-                    default='model_best.model',
+                    # default='model_best.model',
+                    default='',
                     help='path to latest checkpoint')
 parser.add_argument('--output_dir',
                     type=str,
@@ -77,14 +59,19 @@ args = parser.parse_args()
 for arg in vars(args):
     print('Argument:', arg, getattr(args, arg))
 
-train_data = load_processed_data('./dataset/train.txt')
-dev_data = load_processed_data('./dataset/dev.txt')
+# train_data = load_processed_data('./dataset/train.txt')
+# save_pickle(train_data, 'train_data.pickle')
+train_data = load_pickle('train_data.pickle')
+# dev_data = load_processed_data('./dataset/dev.txt')
+# save_pickle(dev_data, 'dev_data.pickle')
+dev_data = load_pickle('dev_data.pickle')
 data = train_data + dev_data
-vocab = set()
-for _, ctx, query, _, _ in data:
-    vocab |= set(ctx + query)
-
-vocab = ['<PAD>', '<UNK>'] + list(sorted(vocab))
+# vocab = set()
+# for _, ctx, query, _, _ in data:
+#     vocab |= set(ctx + query)
+# vocab = ['<PAD>', '<UNK>'] + list(sorted(vocab))
+# save_pickle(vocab, 'vocab.pickle')
+vocab = load_pickle('vocab.pickle')
 w2i = dict((w, i) for i, w in enumerate(vocab, 0))
 i2w = dict((i, w) for i, w in enumerate(vocab, 0))
 args.vocab_size = len(vocab)
@@ -97,8 +84,8 @@ print('query_token_maxlen:', query_token_maxlen)
 args.answer_token_len = 1 # 2 TODO
 
 
-# args.pre_embd = load_pickle('./pickles/glove_embd.pickle')
-args.pre_embd = torch.from_numpy(load_glove_weights('./dataset', args.embd_size, len(vocab), w2i)).type(torch.FloatTensor)
+args.pre_embd = load_pickle('./pickles/glove_embd.pickle')
+# args.pre_embd = torch.from_numpy(load_glove_weights('./dataset', args.embd_size, len(vocab), w2i)).type(torch.FloatTensor)
 # save_pickle(args.pre_embd, './pickles/glove_embd.pickle')
 
 
@@ -110,11 +97,7 @@ def train(data, model, optimizer, loss_fn, n_epoch=5, start_epoch=0, batch_size=
         debug_log('---Epoch {}'.format(epoch))
         losses[str(epoch)] = []
         random.shuffle(data)
-        # start = time.time()
         for i in tqdm(range(0, len(data)-batch_size, batch_size)): # TODO use last elms
-            # elapsed_time = time.time() - start
-            # print ("elapsed_time:{0}".format(elapsed_time) + "[sec]")
-            # start = time.time()
 
             batch_data = data[i:i+batch_size]
             c = [d[1] for d in batch_data]
@@ -122,7 +105,7 @@ def train(data, model, optimizer, loss_fn, n_epoch=5, start_epoch=0, batch_size=
             a_txt = [d[4] for d in batch_data]
             b_ctx_token_maxlen = max([len(cc) for cc in c])
             b_query_token_maxlen = max([len(qq) for qq in q])
-            print('BATCH context maxlen: {}, query maxlen: {}'.format(b_ctx_token_maxlen, b_query_token_maxlen))
+            # print('BATCH context maxlen: {}, query maxlen: {}'.format(b_ctx_token_maxlen, b_query_token_maxlen))
             context_var = make_word_vector(c, w2i, b_ctx_token_maxlen)
             query_var   = make_word_vector(q, w2i, b_query_token_maxlen)
             labels = [d[3][0] for d in batch_data]
@@ -140,15 +123,17 @@ def train(data, model, optimizer, loss_fn, n_epoch=5, start_epoch=0, batch_size=
                 losses[str(epoch)].append(loss.data[0])
 
                 _, preds = torch.max(outs, 1)
-                for j, (pred, label) in enumerate(zip(preds, labels)):
-                    c_label = batch_data[j][0]
-                    if pred.data[0] == label.data[0]:
-                        save_fig_file = '{}/{}_TRAIN_{}_bs-{}_correct.png'.format(args.output_dir, now(), c_label, i)
-                    else:
-                        save_fig_file = '{}/{}_TRAIN_{}_bs-{}_wrong.png'.format(args.output_dir, now(), c_label, i)
-                    ans = batch_data[0][3]
-                    plot_heat_matrix(c[0], q[0], attens[0], ans, output_file=save_fig_file, title='Answer: '+a_txt[0], pred=pred.data[0])
-                    break # just one sample
+                correct = torch.sum(preds == labels).data[0]
+                print('correct: {:.2f}% ({}/{})'.format(correct/batch_size * 100, correct, batch_size))
+                # for j, (pred, label) in enumerate(zip(preds, labels)):
+                #     c_label = batch_data[j][0]
+                #     if pred.data[0] == label.data[0]:
+                #         save_fig_file = '{}/{}_TRAIN_{}_bs-{}_correct.png'.format(args.output_dir, now(), c_label, i)
+                #     else:
+                #         save_fig_file = '{}/{}_TRAIN_{}_bs-{}_wrong.png'.format(args.output_dir, now(), c_label, i)
+                #     ans = batch_data[0][3]
+                #     plot_heat_matrix(c[0], q[0], attens[0], ans, output_file=save_fig_file, title='Answer: '+a_txt[0], pred=pred.data[0])
+                #     break # just one sample
 
             model.zero_grad()
             loss.backward()
@@ -162,16 +147,17 @@ def train(data, model, optimizer, loss_fn, n_epoch=5, start_epoch=0, batch_size=
                 ct += 1
         debug_log('Current Acc: {:.2f}% ({}/{})'.format(ct/len(preds), ct, len(preds)))
 
-        filename = '{}/{}_Epoch-{}.model'.format(args.output_dir, now(), epoch)
-        save_checkpoint({
-            'epoch': epoch + 1,
-            'state_dict': model.state_dict(),
-            'optimizer' : optimizer.state_dict(),
-        }, is_best=True, filename=filename)
+        # filename = '{}/{}_Epoch-{}.model'.format(args.output_dir, now(), epoch)
+        # save_checkpoint({
+        #     'epoch': epoch + 1,
+        #     'state_dict': model.state_dict(),
+        #     'optimizer' : optimizer.state_dict(),
+        # }, is_best=True, filename=filename)
 
-    save_pickle(losses, '{}/{}_train_losses.pickle'.format(args.output_dir, now()))
+    # save_pickle(losses, '{}/{}_train_losses.pickle'.format(args.output_dir, now()))
 
 
+# def test {{{
 def test(data, model, batch_size=32):
     model.eval()
     correct = 0
@@ -213,10 +199,12 @@ def test(data, model, batch_size=32):
             already_saved = True
         total += batch_size
     print('Test Acc: {:.2f}% ({}/{})'.format(correct/total, correct, total))
+# }}}
 
 # model = JNet(args)
-model = MatchLSTM(args)
 # model = SimpleNet(args)
+# model = MatchLSTM(args)
+model = AttentionNet(args)
 optimizer = torch.optim.Adamax(filter(lambda p: p.requires_grad, model.parameters()))
 loss_fn = nn.NLLLoss()
 

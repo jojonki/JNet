@@ -3,12 +3,13 @@ import torch.nn as nn
 import torch.nn.functional as F
 from process_data import to_var
 
+
 class PointerNetwork(nn.Module):
     def __init__(self, hidden_size, weight_size, answer_seq_len=2):
         super(PointerNetwork, self).__init__()
 
         self.hidden_size = hidden_size
-        self.weight_size = weight_size 
+        self.weight_size = weight_size
         self.answer_seq_len = answer_seq_len
 
         self.enc = nn.LSTM(hidden_size, hidden_size, batch_first=True)  # TODO bidirectional
@@ -55,11 +56,7 @@ class PointerNetwork(nn.Module):
 
         probs = torch.stack(probs, dim=2) # (L, N, M)
         # print('probs', probs.size())
-        probs = probs.permute(1, 2, 0).contiguous()    #(N, M, L)
+        probs = probs.permute(1, 2, 0).contiguous() # (N, M, L)
         probs = F.log_softmax(probs.view(-1, L))
         probs = probs.view(batch_size, self.answer_seq_len, L)
-        # print('probs', probs.size())
-
-        # return F.log_softmax(probs)
         return probs
-
