@@ -13,7 +13,7 @@ import torch.nn as nn
 from process_data import save_pickle, load_pickle, load_processed_data, load_glove_weights, to_var, make_word_vector
 # from jnet import JNet
 # from simple_net import SimpleNet
-from match_lstm import MatchLSTM
+from layers.match_lstm import MatchLSTM
 from plotter import plot_heat_matrix
 
 

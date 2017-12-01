@@ -2,8 +2,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from word_embedding import WordEmbedding
-from pointer_network import PointerNetwork
+from layers.word_embedding import WordEmbedding
+from layers.pointer_network import PointerNetwork
 from process_data import to_var
 
 
