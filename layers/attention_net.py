@@ -32,8 +32,6 @@ class AttentionNet(nn.Module):
 
     def build_contextual_embd(self, x):
         embd = self.word_embd_net(x) # (N, seq_len, embd_size)
-        if torch.cuda.is_available():
-            embd = embd.cuda()
 
         # 3. Contextual  Embedding Layer
         ctx_embd_out, _h = self.ctx_embd_layer(embd)
