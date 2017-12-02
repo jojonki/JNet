@@ -2,3 +2,5 @@
 *.pickle
 *.tar
 *.png
+outputs/
+*.model
