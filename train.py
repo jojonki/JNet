@@ -91,16 +91,15 @@ args.pre_embd = torch.from_numpy(load_glove_weights('./dataset', args.embd_size,
 # save_pickle(args.pre_embd, './pickles/glove_embd.pickle')
 
 
-def train(data, model, optimizer, loss_fn, n_epoch=5, start_epoch=0, batch_size=32):
-    model.train()
+def train(model, data, test_data, optimizer, loss_fn, n_epoch=5, start_epoch=0, batch_size=32):
     debug_log('Training starts from {} to {}'.format(start_epoch, 'to', n_epoch))
     losses = {}
     for epoch in range(start_epoch, n_epoch+1):
+        model.train()
         debug_log('---Epoch {}'.format(epoch))
         losses[str(epoch)] = []
         random.shuffle(data)
         for i in tqdm(range(0, len(data)-batch_size, batch_size)): # TODO use last elms
-
             batch_data = data[i:i+batch_size]
             c = [d[1] for d in batch_data]
             q = [d[2] for d in batch_data]
@@ -155,12 +154,13 @@ def train(data, model, optimizer, loss_fn, n_epoch=5, start_epoch=0, batch_size=
             'state_dict': model.state_dict(),
             'optimizer' : optimizer.state_dict(),
         }, is_best=True, filename=filename)
+        test(model, test_data)
 
     save_pickle(losses, '{}/{}_train_losses.pickle'.format(args.output_dir, now()))
 
 
 # def test {{{
-def test(data, model, batch_size=32):
+def test(model, data, batch_size=32):
     model.eval()
     correct = 0
     total = 0
@@ -169,7 +169,7 @@ def test(data, model, batch_size=32):
         batch_data = data[i:i+batch_size]
         c = [d[1] for d in batch_data]
         q = [d[2] for d in batch_data]
-        a_txt = [d[4] for d in batch_data]
+        # a_txt = [d[4] for d in batch_data]
         b_ctx_token_maxlen = max([len(cc) for cc in c])
         b_query_token_maxlen = max([len(qq) for qq in q])
         context_var = make_word_vector(c, w2i, b_ctx_token_maxlen)
@@ -185,7 +185,7 @@ def test(data, model, batch_size=32):
 
         _, preds = torch.max(outs, 1)
         correct += torch.sum(preds == labels).data[0]
-        print(correct, '/', batch_size)
+        # print(correct, '/', batch_size)
         # already_saved = False
         # for j, (pred, label) in enumerate(zip(preds, labels)):
         #     c_label = batch_data[j][0]
@@ -232,8 +232,8 @@ if torch.cuda.is_available():
 #     print(p)
 
 if args.test != 1:
-    train(train_data, model, optimizer, loss_fn, args.n_epoch, args.start_epoch)
+    train(model, train_data, dev_data, optimizer, loss_fn, args.n_epoch, args.start_epoch)
 
-test(dev_data, model)
+test(model, dev_data)
 
 debug_log('Finish')
