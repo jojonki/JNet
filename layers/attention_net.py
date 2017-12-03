@@ -1,3 +1,4 @@
+import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -20,7 +21,8 @@ class AttentionNet(nn.Module):
         self.word_embd_net = WordEmbedding(args.vocab_size, args.embd_size, args.pre_embd)
         self.ctx_embd_layer = nn.GRU(self.embd_size, self.embd_size, bidirectional=True, dropout=0.2)
 
-        self.W = nn.Parameter(torch.rand(1, 3*self.d, 1).type(torch.FloatTensor), requires_grad=True) # (N, dd, 1)
+        init_val = 0.01
+        self.W = nn.Parameter(torch.Tensor(1, 3*self.d, 1).uniform_(-init_val, init_val).type(torch.FloatTensor), requires_grad=True) # (N, dd, 1)
 
         self.modeling_layer = nn.GRU(4*self.d, self.d, bidirectional=True, dropout=0.2)
 
