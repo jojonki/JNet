@@ -201,7 +201,7 @@ def test(model, data, batch_size=32):
         #         plot_heat_matrix(c[j], q[j], attens[j], ans, output_file=save_fig_file, title='Answer: '+a_txt[j], pred=pred.data[0])
         #     already_saved = True
         total += batch_size
-    print('Test Acc: {:.2f}% ({}/{})'.format(correct/total, correct, total))
+    print('Test Acc: {:.2f}% ({}/{})'.format(100*correct/total, correct, total))
 # }}}
 
 # model = JNet(args)
