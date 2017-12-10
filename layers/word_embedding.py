@@ -1,5 +1,4 @@
 import torch.nn as nn
-import torch.nn.functional as F
 
 
 # In : (N, sentence_len)
@@ -13,4 +12,4 @@ class WordEmbedding(nn.Module):
             self.embedding.weight = nn.Parameter(pre_embd, requires_grad=is_train_embd)
 
     def forward(self, x):
-        return F.relu(self.embedding(x))
+        return self.embedding(x)
